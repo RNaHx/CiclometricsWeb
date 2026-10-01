@@ -1,0 +1,30 @@
+{
+  "name": "ciclometrics-backend",
+  "version": "1.0.0",
+  "description": "Backend API y motor de cálculo físico-mecánico para CicloMetrics Web",
+  "main": "src/server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node tests/verifyCalculations.js && node tests/verifyApiEndpoints.js",
+    "test:calc": "node tests/verifyCalculations.js",
+    "test:api": "node tests/verifyApiEndpoints.js"
+  },
+  "keywords": [
+    "cycling",
+    "metrics",
+    "met",
+    "calories",
+    "tire-pressure",
+    "elevation",
+    "gps"
+  ],
+  "author": "CicloMetrics Team",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  }
+}

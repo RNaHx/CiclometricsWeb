@@ -1,0 +1,58 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+/* Estilos de personalización para mapas Leaflet y HUD ciclista */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  border-radius: 0.75rem;
+  z-index: 10;
+}
+
+/* Scrollbar personalizado para paneles deportivos */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.4);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.7);
+}
+
+/* Modo oscuro para tiles de Leaflet (Calles y CyclOSM) - Sin marcas de agua */
+.dark-map-tiles .leaflet-tile-pane {
+  filter: brightness(0.7) invert(1) contrast(3) hue-rotate(200deg) saturate(0.35);
+  transition: filter 0.3s ease;
+}
+
+/* Fondo oscuro y controles estilizados en dark mode para Leaflet */
+.dark .leaflet-container {
+  background-color: #0b1120 !important;
+}
+.dark .leaflet-bar a {
+  background-color: rgba(15, 23, 42, 0.9) !important;
+  color: #e2e8f0 !important;
+  border-bottom: 1px solid #1e293b !important;
+  backdrop-filter: blur(4px);
+}
+.dark .leaflet-bar a:hover {
+  background-color: #1e293b !important;
+  color: #10b981 !important;
+}
+.dark .leaflet-control-attribution {
+  background-color: rgba(15, 23, 42, 0.85) !important;
+  color: #94a3b8 !important;
+  font-size: 10px !important;
+  border-radius: 6px 0 0 0;
+  backdrop-filter: blur(4px);
+}
+.dark .leaflet-control-attribution a {
+  color: #38bdf8 !important;
+}
+
