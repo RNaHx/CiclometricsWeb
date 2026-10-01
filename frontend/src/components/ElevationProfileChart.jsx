@@ -12,9 +12,26 @@ export default function ElevationProfileChart({
 
   if (!points || points.length === 0) {
     return (
-      <div className="h-64 flex flex-col items-center justify-center rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-400 p-6 text-center">
-        <Mountain className="w-10 h-10 mb-2 opacity-40 animate-pulse" />
-        <p className="text-sm font-medium">Cargando perfil altimétrico de la ruta...</p>
+      <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-lg transition-colors">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+              <Activity className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                Perfil Altimétrico de Elevación
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Ascenso acumulado: -- m
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="h-44 flex flex-col items-center justify-center text-center text-slate-400 bg-slate-50/50 dark:bg-slate-800/30 rounded-xl border border-dashed border-slate-200 dark:border-slate-800">
+          <Mountain className="w-8 h-8 mb-2 opacity-40" />
+          <p className="text-xs">Sin datos de elevación disponibles. Calcule una ruta para renderizar la altimetría.</p>
+        </div>
       </div>
     );
   }
@@ -51,19 +68,35 @@ export default function ElevationProfileChart({
 
   const areaD = `${pathD} L ${getX(points[points.length - 1].distance)} ${padding.top + chartHeight} L ${getX(points[0].distance)} ${padding.top + chartHeight} Z`;
 
-  // Cálculo de pendiente puntual para cada tramo
+  // Cálculo de pendiente con ventana espacial suavizada (60-80 metros) y acotada físicamente
   const getSlope = (index) => {
-    if (index === 0) {
-      if (points.length < 2) return 0;
-      const dD = points[1].distance - points[0].distance;
-      const dE = points[1].elevation - points[0].elevation;
-      return dD > 0 ? (dE / dD) * 100 : 0;
+    if (!points || points.length < 2 || index < 0 || index >= points.length) return 0;
+
+    const currentDist = points[index].distance;
+    const targetHalfWindow = 40; // Ventana total de 80m (40m atrás, 40m adelante)
+
+    // Buscar límite hacia atrás
+    let startIdx = index;
+    while (startIdx > 0 && (currentDist - points[startIdx].distance) < targetHalfWindow) {
+      startIdx--;
     }
-    const prev = points[index - 1];
-    const curr = points[index];
-    const dDist = curr.distance - prev.distance;
-    const dElev = curr.elevation - prev.elevation;
-    return dDist > 0 ? (dElev / dDist) * 100 : 0;
+
+    // Buscar límite hacia adelante
+    let endIdx = index;
+    while (endIdx < points.length - 1 && (points[endIdx].distance - currentDist) < targetHalfWindow) {
+      endIdx++;
+    }
+
+    const pStart = points[startIdx];
+    const pEnd = points[endIdx];
+    const dDist = pEnd.distance - pStart.distance;
+    const dElev = pEnd.elevation - pStart.elevation;
+
+    if (dDist < 5) return 0;
+
+    const rawSlope = (dElev / dDist) * 100;
+    // Acotar físicamente en el rango [-30%, +30%]
+    return Math.max(-30, Math.min(30, rawSlope));
   };
 
   // Manejo de interacción táctil / mouse
@@ -108,6 +141,15 @@ export default function ElevationProfileChart({
   const activePoint = hoverIndex !== null ? points[hoverIndex] : null;
   const activeSlope = hoverIndex !== null ? getSlope(hoverIndex) : null;
 
+  const calculatedAscent = React.useMemo(() => {
+    let gain = 0;
+    for (let i = 0; i < points.length - 1; i++) {
+      const diff = points[i + 1].elevation - points[i].elevation;
+      if (diff > 0) gain += diff;
+    }
+    return Math.round(gain);
+  }, [points]);
+
   return (
     <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-lg transition-colors">
       
@@ -119,10 +161,12 @@ export default function ElevationProfileChart({
           </div>
           <div>
             <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">
-              Perfil Altimétrico Continuo (Topografía)
+              Perfil Altimétrico de Elevación
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Interpolación LERP de elevación y gradientes tramo a tramo
+              {points.length > 0 
+                ? `Ascenso Acumulado: ${calculatedAscent} m | Máx: ${Math.round(maxElevationRaw)} m` 
+                : 'Ascenso acumulado: -- m'}
             </p>
           </div>
         </div>

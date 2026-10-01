@@ -91,38 +91,63 @@ export default function InteractiveMap({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // 1. Inicialización de Leaflet
+  // 1. Inicialización de Leaflet blindada
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
-    if (!mapInstanceRef.current) {
-      // Santiago default coordinates: [-33.4350, -70.6350]
-      const map = L.map(mapContainerRef.current, {
-        center: selectedRoute ? selectedRoute.center : [-33.4350, -70.6350],
-        zoom: selectedRoute ? selectedRoute.zoom : 13,
-        zoomControl: false
-      });
+    try {
+      // Prevención de "Map container is already initialized" en React 18 StrictMode
+      if (mapContainerRef.current._leaflet_id && !mapInstanceRef.current) {
+        mapContainerRef.current._leaflet_id = null;
+      }
 
-      L.control.zoom({ position: 'bottomright' }).addTo(map);
+      if (!mapInstanceRef.current) {
+        // Coordenadas iniciales por defecto (Santiago Centro / Providencia)
+        const initialCenter = selectedRoute?.center || [-33.4350, -70.6350];
+        const initialZoom = selectedRoute?.zoom || 13;
 
-      // Tile layer inicial (CyclOSM por defecto)
-      const layerConfig = MAP_LAYERS.cyclosm;
-      const tileLayer = L.tileLayer(layerConfig.url, {
-        attribution: layerConfig.attribution,
-        subdomains: layerConfig.subdomains || 'abc',
-        maxZoom: layerConfig.maxZoom || 18
-      }).addTo(map);
+        const map = L.map(mapContainerRef.current, {
+          center: initialCenter,
+          zoom: initialZoom,
+          zoomControl: false
+        });
 
-      mapInstanceRef.current = map;
-      mapInstanceRef.current._tileLayer = tileLayer;
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-      const layerGroup = L.layerGroup().addTo(map);
-      layerGroupRef.current = layerGroup;
+        // Tile layer inicial (CyclOSM por defecto)
+        const layerConfig = MAP_LAYERS.cyclosm;
+        const tileLayer = L.tileLayer(layerConfig.url, {
+          attribution: layerConfig.attribution,
+          subdomains: layerConfig.subdomains || 'abc',
+          maxZoom: layerConfig.maxZoom || 18
+        }).addTo(map);
+
+        mapInstanceRef.current = map;
+        mapInstanceRef.current._tileLayer = tileLayer;
+
+        const layerGroup = L.layerGroup().addTo(map);
+        layerGroupRef.current = layerGroup;
+
+        // Asegurar que Leaflet calcule dimensiones DOM correctas
+        setTimeout(() => {
+          try {
+            map.invalidateSize();
+          } catch (e) {
+            console.warn('Error en invalidateSize inicial:', e);
+          }
+        }, 150);
+      }
+    } catch (err) {
+      console.error('Error al inicializar Leaflet:', err);
     }
 
     return () => {
       if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
+        try {
+          mapInstanceRef.current.remove();
+        } catch (e) {
+          console.warn('Error al desmontar mapa Leaflet:', e);
+        }
         mapInstanceRef.current = null;
       }
     };
@@ -131,21 +156,25 @@ export default function InteractiveMap({
   // 2. Cambio dinámico de proveedor de capa (CyclOSM, OSM, Satélite)
   useEffect(() => {
     if (!mapInstanceRef.current) return;
-    const map = mapInstanceRef.current;
-    const layerConfig = MAP_LAYERS[activeLayer];
-    if (!layerConfig) return;
+    try {
+      const map = mapInstanceRef.current;
+      const layerConfig = MAP_LAYERS[activeLayer];
+      if (!layerConfig) return;
 
-    if (map._tileLayer) {
-      map.removeLayer(map._tileLayer);
+      if (map._tileLayer) {
+        map.removeLayer(map._tileLayer);
+      }
+
+      const newTileLayer = L.tileLayer(layerConfig.url, {
+        attribution: layerConfig.attribution,
+        subdomains: layerConfig.subdomains || 'abc',
+        maxZoom: layerConfig.maxZoom || 19
+      }).addTo(map);
+
+      map._tileLayer = newTileLayer;
+    } catch (err) {
+      console.warn('Error al cambiar capa en mapa Leaflet:', err);
     }
-
-    const newTileLayer = L.tileLayer(layerConfig.url, {
-      attribution: layerConfig.attribution,
-      subdomains: layerConfig.subdomains || 'abc',
-      maxZoom: layerConfig.maxZoom || 19
-    }).addTo(map);
-
-    map._tileLayer = newTileLayer;
   }, [activeLayer]);
 
   // 3. Manejo de clics en el mapa para marcar punto A y punto B
@@ -154,56 +183,73 @@ export default function InteractiveMap({
     const map = mapInstanceRef.current;
 
     const handleMapClick = (e) => {
-      if (!isCustomMode || isRouting) return;
+      try {
+        if (!isCustomMode || isRouting) return;
 
-      const { lat, lng } = e.latlng;
-      const newPoint = [parseFloat(lat.toFixed(5)), parseFloat(lng.toFixed(5))];
+        const { lat, lng } = e.latlng;
+        const newPoint = [parseFloat(lat.toFixed(5)), parseFloat(lng.toFixed(5))];
 
-      setCustomMarkers(prev => {
-        if (prev.length >= 2) {
-          return [newPoint];
-        } else {
-          const next = [...prev, newPoint];
-          if (next.length === 2) {
-            handleBuildCustomRoute(next[0], next[1]);
+        setCustomMarkers(prev => {
+          if (prev.length >= 2) {
+            return [newPoint];
+          } else {
+            const next = [...prev, newPoint];
+            if (next.length === 2) {
+              handleBuildCustomRoute(next[0], next[1]);
+            }
+            return next;
           }
-          return next;
-        }
-      });
+        });
+      } catch (err) {
+        console.warn('Error en click sobre el mapa:', err);
+      }
     };
 
-    map.on('click', handleMapClick);
+    try {
+      map.on('click', handleMapClick);
+    } catch (e) {
+      console.warn('Error asociando evento click al mapa:', e);
+    }
+
     return () => {
-      map.off('click', handleMapClick);
+      try {
+        map.off('click', handleMapClick);
+      } catch (e) {
+        // Ignorar si el mapa ya fue desmontado
+      }
     };
   }, [isCustomMode, isRouting]);
 
   // Marcador temporal visual para Punto A mientras se espera el Punto B
   useEffect(() => {
     if (!mapInstanceRef.current) return;
-    const map = mapInstanceRef.current;
+    try {
+      const map = mapInstanceRef.current;
 
-    if (isCustomMode && customMarkers.length === 1) {
-      const originIcon = L.divIcon({
-        className: 'custom-map-icon',
-        html: `
-          <div style="background-color: #10b981; width: 28px; height: 28px; border-radius: 50%; border: 3px solid #ffffff; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.6); display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: bold; animation: bounce 1s infinite;">
-            A
-          </div>
-        `,
-        iconSize: [28, 28],
-        iconAnchor: [14, 14]
-      });
+      if (isCustomMode && customMarkers.length === 1) {
+        const originIcon = L.divIcon({
+          className: 'custom-map-icon',
+          html: `
+            <div style="background-color: #10b981; width: 28px; height: 28px; border-radius: 50%; border: 3px solid #ffffff; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.6); display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: bold; animation: bounce 1s infinite;">
+              A
+            </div>
+          `,
+          iconSize: [28, 28],
+          iconAnchor: [14, 14]
+        });
 
-      if (tempMarkerRef.current) {
-        map.removeLayer(tempMarkerRef.current);
+        if (tempMarkerRef.current) {
+          map.removeLayer(tempMarkerRef.current);
+        }
+        tempMarkerRef.current = L.marker(customMarkers[0], { icon: originIcon }).addTo(map);
+      } else {
+        if (tempMarkerRef.current) {
+          map.removeLayer(tempMarkerRef.current);
+          tempMarkerRef.current = null;
+        }
       }
-      tempMarkerRef.current = L.marker(customMarkers[0], { icon: originIcon }).addTo(map);
-    } else {
-      if (tempMarkerRef.current) {
-        map.removeLayer(tempMarkerRef.current);
-        tempMarkerRef.current = null;
-      }
+    } catch (err) {
+      console.warn('Error actualizando marcador temporal:', err);
     }
   }, [isCustomMode, customMarkers]);
 
@@ -376,98 +422,120 @@ export default function InteractiveMap({
   // 5. Renderizado del trazado de la ruta activa y sus marcadores
   useEffect(() => {
     if (!mapInstanceRef.current || !layerGroupRef.current) return;
-    const map = mapInstanceRef.current;
-    const layerGroup = layerGroupRef.current;
-    layerGroup.clearLayers();
+    try {
+      const map = mapInstanceRef.current;
+      const layerGroup = layerGroupRef.current;
+      layerGroup.clearLayers();
 
-    const activeCoords = selectedRoute?.coordinates || [];
-    if (activeCoords.length === 0) return;
+      const activeCoords = selectedRoute?.coordinates || [];
+      if (activeCoords.length === 0) return;
 
-    // 1. Trazado de sombra brillante (Glow effect)
-    const glowLine = L.polyline(activeCoords, {
-      color: theme === 'dark' ? '#00f2fe' : '#0284c7',
-      weight: 8,
-      opacity: 0.35,
-      lineCap: 'round',
-      lineJoin: 'round'
-    });
-    layerGroup.addLayer(glowLine);
+      // 1. Trazado de sombra brillante (Glow effect)
+      const glowLine = L.polyline(activeCoords, {
+        color: theme === 'dark' ? '#00f2fe' : '#0284c7',
+        weight: 8,
+        opacity: 0.35,
+        lineCap: 'round',
+        lineJoin: 'round'
+      });
+      layerGroup.addLayer(glowLine);
 
-    // 2. Trazado de ruta principal (Línea sólida ciclista)
-    const mainLine = L.polyline(activeCoords, {
-      color: theme === 'dark' ? '#10b981' : '#059669',
-      weight: 4.5,
-      opacity: 0.95,
-      lineCap: 'round',
-      lineJoin: 'round'
-    });
-    layerGroup.addLayer(mainLine);
+      // 2. Trazado de ruta principal (Línea sólida ciclista)
+      const mainLine = L.polyline(activeCoords, {
+        color: theme === 'dark' ? '#10b981' : '#059669',
+        weight: 4.5,
+        opacity: 0.95,
+        lineCap: 'round',
+        lineJoin: 'round'
+      });
+      layerGroup.addLayer(mainLine);
 
-    // 3. Marcador de Origen (Verde)
-    const originCoord = activeCoords[0];
-    const originIcon = L.divIcon({
-      className: 'custom-map-icon',
-      html: `
-        <div style="background-color: #10b981; width: 26px; height: 26px; border-radius: 50%; border: 3px solid #ffffff; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: white; font-size: 11px; font-weight: bold;">
-          A
-        </div>
-      `,
-      iconSize: [26, 26],
-      iconAnchor: [13, 13]
-    });
-    const originMarker = L.marker(originCoord, { icon: originIcon });
-    originMarker.bindPopup(`<b>Origen:</b> ${selectedRoute?.origen || 'Punto de Partida'}`);
-    layerGroup.addLayer(originMarker);
+      // 3. Marcador de Origen (Verde)
+      const originCoord = activeCoords[0];
+      const originIcon = L.divIcon({
+        className: 'custom-map-icon',
+        html: `
+          <div style="background-color: #10b981; width: 26px; height: 26px; border-radius: 50%; border: 3px solid #ffffff; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: white; font-size: 11px; font-weight: bold;">
+            A
+          </div>
+        `,
+        iconSize: [26, 26],
+        iconAnchor: [13, 13]
+      });
+      const originMarker = L.marker(originCoord, { icon: originIcon });
+      originMarker.bindPopup(`<b>Origen:</b> ${selectedRoute?.origen || 'Punto de Partida'}`);
+      layerGroup.addLayer(originMarker);
 
-    // 4. Marcador de Destino (Rojo / Bandera)
-    const destCoord = activeCoords[activeCoords.length - 1];
-    const destIcon = L.divIcon({
-      className: 'custom-map-icon',
-      html: `
-        <div style="background-color: #ef4444; width: 26px; height: 26px; border-radius: 50%; border: 3px solid #ffffff; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: white; font-size: 11px; font-weight: bold;">
-          B
-        </div>
-      `,
-      iconSize: [26, 26],
-      iconAnchor: [13, 13]
-    });
-    const destMarker = L.marker(destCoord, { icon: destIcon });
-    destMarker.bindPopup(`<b>Destino:</b> ${selectedRoute?.destino || 'Meta'}`);
-    layerGroup.addLayer(destMarker);
+      // 4. Marcador de Destino (Rojo / Bandera)
+      const destCoord = activeCoords[activeCoords.length - 1];
+      const destIcon = L.divIcon({
+        className: 'custom-map-icon',
+        html: `
+          <div style="background-color: #ef4444; width: 26px; height: 26px; border-radius: 50%; border: 3px solid #ffffff; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: white; font-size: 11px; font-weight: bold;">
+            B
+          </div>
+        `,
+        iconSize: [26, 26],
+        iconAnchor: [13, 13]
+      });
+      const destMarker = L.marker(destCoord, { icon: destIcon });
+      destMarker.bindPopup(`<b>Destino:</b> ${selectedRoute?.destino || 'Meta'}`);
+      layerGroup.addLayer(destMarker);
 
-    // Ajustar vista del mapa para encuadrar la ruta
-    map.fitBounds(mainLine.getBounds(), { padding: [40, 40], maxZoom: 15 });
+      // Ajustar vista del mapa para encuadrar la ruta de forma segura
+      if (mainLine && typeof mainLine.getBounds === 'function') {
+        const bounds = mainLine.getBounds();
+        if (bounds && typeof bounds.isValid === 'function' && bounds.isValid()) {
+          setTimeout(() => {
+            try {
+              if (mapInstanceRef.current) {
+                mapInstanceRef.current.invalidateSize();
+                mapInstanceRef.current.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
+              }
+            } catch (boundsErr) {
+              console.warn('Error al ajustar límites de mapa con fitBounds:', boundsErr);
+            }
+          }, 100);
+        }
+      }
+    } catch (err) {
+      console.warn('Error en renderizado de ruta en mapa Leaflet:', err);
+    }
   }, [selectedRoute, theme]);
 
   // 6. Marcador dinámico para sincronización de hover con el gráfico de elevación
   useEffect(() => {
     if (!mapInstanceRef.current) return;
-    const map = mapInstanceRef.current;
+    try {
+      const map = mapInstanceRef.current;
 
-    if (!hoverCoordinate) {
-      if (hoverMarkerRef.current) {
-        map.removeLayer(hoverMarkerRef.current);
-        hoverMarkerRef.current = null;
+      if (!hoverCoordinate) {
+        if (hoverMarkerRef.current) {
+          map.removeLayer(hoverMarkerRef.current);
+          hoverMarkerRef.current = null;
+        }
+        return;
       }
-      return;
-    }
 
-    const hoverIcon = L.divIcon({
-      className: 'custom-hover-icon',
-      html: `
-        <div style="position: relative;">
-          <div style="background-color: #f59e0b; width: 18px; height: 18px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 12px #f59e0b; animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
-          <div style="background-color: #f59e0b; width: 18px; height: 18px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.4); position: absolute; top: 0; left: 0;"></div>
-        </div>
-      `,
-      iconSize: [18, 18],
-      iconAnchor: [9, 9]
-    });
+      const hoverIcon = L.divIcon({
+        className: 'custom-hover-icon',
+        html: `
+          <div style="position: relative;">
+            <div style="background-color: #f59e0b; width: 18px; height: 18px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 12px #f59e0b; animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+            <div style="background-color: #f59e0b; width: 18px; height: 18px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.4); position: absolute; top: 0; left: 0;"></div>
+          </div>
+        `,
+        iconSize: [18, 18],
+        iconAnchor: [9, 9]
+      });
 
-    if (!hoverMarkerRef.current) {
-      hoverMarkerRef.current = L.marker(hoverCoordinate, { icon: hoverIcon, zIndexOffset: 1000 }).addTo(map);
-    } else {
-      hoverMarkerRef.current.setLatLng(hoverCoordinate);
+      if (!hoverMarkerRef.current) {
+        hoverMarkerRef.current = L.marker(hoverCoordinate, { icon: hoverIcon, zIndexOffset: 1000 }).addTo(map);
+      } else {
+        hoverMarkerRef.current.setLatLng(hoverCoordinate);
+      }
+    } catch (err) {
+      console.warn('Error sincronizando marcador hover en mapa:', err);
     }
   }, [hoverCoordinate]);
 

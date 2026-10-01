@@ -116,7 +116,78 @@ function interpolateElevationProfile(points, options = {}) {
   return normalized;
 }
 
+/**
+ * Suaviza el perfil altimétrico utilizando un Kernel Gaussiano de ventana adaptativa (50-100m).
+ * Elimina ruido discreto de DEM/GPS (escalonamiento, picos y valles espurios)
+ * que generan pendientes irreales de hasta -105.5%.
+ *
+ * @param {Array<Object>} points - Puntos con { distance, elevation }
+ * @param {Object} [options]
+ * @param {number} [options.windowDistanceMeters=80] - Ventana de suavizado espacial en metros (~50-100m)
+ * @returns {Array<Object>} Lista de puntos con elevación suavizada físicamente
+ */
+function smoothElevationProfile(points, options = {}) {
+  const { windowDistanceMeters = 80 } = options;
+
+  if (!Array.isArray(points) || points.length <= 2) {
+    return points ? points.map((p) => ({ ...p })) : [];
+  }
+
+  const n = points.length;
+  const smoothed = [];
+  const sigma = Math.max(10, windowDistanceMeters / 2.5); // Desviación estándar espacial
+
+  for (let i = 0; i < n; i++) {
+    const current = points[i];
+    const currentDist = typeof current.distance === 'number' ? current.distance : i * 100;
+
+    let weightedElevSum = 0;
+    let weightSum = 0;
+
+    for (let j = 0; j < n; j++) {
+      const p = points[j];
+      const pDist = typeof p.distance === 'number' ? p.distance : j * 100;
+      const distDelta = pDist - currentDist;
+
+      if (Math.abs(distDelta) <= windowDistanceMeters * 1.5) {
+        // Ponderación kernel Gaussiano: exp(-distDelta^2 / (2 * sigma^2))
+        const weight = Math.exp(-(distDelta * distDelta) / (2 * sigma * sigma));
+        weightedElevSum += (p.elevation || 0) * weight;
+        weightSum += weight;
+      }
+    }
+
+    let smoothedElevation = weightSum > 0 ? weightedElevSum / weightSum : (current.elevation || 0);
+
+    // Preservar fielmente los extremos inicial y final de la ruta
+    if (i === 0 || i === n - 1) {
+      smoothedElevation = current.elevation;
+    } else {
+      const distFromStart = currentDist - (points[0].distance || 0);
+      const distFromEnd = (points[n - 1].distance || 0) - currentDist;
+      const blendSpan = windowDistanceMeters * 0.5;
+
+      if (distFromStart < blendSpan && distFromStart > 0) {
+        const factor = distFromStart / blendSpan;
+        smoothedElevation = points[0].elevation * (1 - factor) + smoothedElevation * factor;
+      } else if (distFromEnd < blendSpan && distFromEnd > 0) {
+        const factor = distFromEnd / blendSpan;
+        smoothedElevation = points[n - 1].elevation * (1 - factor) + smoothedElevation * factor;
+      }
+    }
+
+    smoothed.push({
+      ...current,
+      elevation: Math.round(smoothedElevation * 10) / 10,
+      smoothed: true
+    });
+  }
+
+  return smoothed;
+}
+
 module.exports = {
   isValidElevation,
-  interpolateElevationProfile
+  interpolateElevationProfile,
+  smoothElevationProfile
 };

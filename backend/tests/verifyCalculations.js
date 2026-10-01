@@ -5,7 +5,10 @@
  */
 
 const assert = require('assert');
-const { interpolateElevationProfile } = require('../src/calculators/elevationInterpolator');
+const {
+  interpolateElevationProfile,
+  smoothElevationProfile
+} = require('../src/calculators/elevationInterpolator');
 const {
   estimateSpeedForGrade,
   getMetForGrade,
@@ -211,6 +214,93 @@ test('Ejecuta análisis integral de ruta con elevación, MET, ETA y presiones', 
   assert(analysis.desglose_tramos.flat.distanceKm > 0, 'Debe haber tramo plano');
   assert(analysis.desglose_tramos.moderateClimb.distanceKm > 0, 'Debe haber tramo subida moderada');
   assert(analysis.desglose_tramos.downhill.distanceKm > 0, 'Debe haber tramo bajada');
+});
+
+console.log('\n--- 6. Pruebas de Suavizado Altimétrico y Mitigación de Pendiente Irreal (-105.5%) ---');
+
+test('smoothElevationProfile atenúa ruido DEM y mantiene continuidad física', () => {
+  const noisyPoints = [
+    { distance: 0, elevation: 580 },
+    { distance: 20, elevation: 601 }, // Ruido abrupto (+21m en 20m)
+    { distance: 40, elevation: 580 }, // Ruido abrupto (-21m en 20m)
+    { distance: 60, elevation: 582 },
+    { distance: 80, elevation: 585 },
+    { distance: 100, elevation: 590 }
+  ];
+
+  const smoothed = smoothElevationProfile(noisyPoints, { windowDistanceMeters: 60 });
+  assert.strictEqual(smoothed.length, noisyPoints.length);
+  // Preserva cotas de inicio y término
+  assert.strictEqual(smoothed[0].elevation, 580);
+  assert.strictEqual(smoothed[smoothed.length - 1].elevation, 590);
+  // El pico intermedio de 601 se amortigua sustancialmente
+  assert(smoothed[1].elevation < 598, `Pico no amortiguado: ${smoothed[1].elevation}`);
+});
+
+test('Elimina anomalías de pendiente irreal (-105.5%) en tramos con saltos bruscos DEM', () => {
+  // Simulación del salto abrupto reportado (-21m en 20m de distancia = -105%)
+  const extremeDropPoints = [
+    { distance: 0, elevation: 610 },
+    { distance: 20, elevation: 589 },  // -21m en 20m sin mitigación daría -105.0%
+    { distance: 60, elevation: 590 },
+    { distance: 120, elevation: 595 },
+    { distance: 200, elevation: 600 }
+  ];
+
+  const analysis = analyzeRoute({
+    points: extremeDropPoints,
+    user: { biometria: { peso: 75 } },
+    bicycle: { peso: 10, tipo: 'ruta' }
+  });
+
+  // Ninguna pendiente puede ser inferior al -30% ni superior al +30%
+  assert(
+    analysis.pendiente_promedio_pct >= -30 && analysis.pendiente_promedio_pct <= 30,
+    `Pendiente promedio fuera de límites físicos: ${analysis.pendiente_promedio_pct}%`
+  );
+  assert(
+    analysis.pendiente_maxima_pct <= 30 && analysis.pendiente_maxima_pct >= -30,
+    `Pendiente máxima fuera de límites físicos: ${analysis.pendiente_maxima_pct}%`
+  );
+  assert.notStrictEqual(analysis.pendiente_promedio_pct, -105.5);
+  assert.notStrictEqual(analysis.pendiente_maxima_pct, -105.5);
+});
+
+test('Ruta Cerro San Cristóbal (curvas cerradas y escalones DEM) no excede +-30%', () => {
+  // Muestra realista del tramo crítico de subida y curvas del Cerro San Cristóbal
+  const sanCristobalSample = [
+    { distance: 0, elevation: 580 },
+    { distance: 74, elevation: 584 },
+    { distance: 98, elevation: 584 },
+    { distance: 231, elevation: 581 },
+    { distance: 363, elevation: 580 },
+    { distance: 523, elevation: 582 },
+    { distance: 605, elevation: 581 },
+    { distance: 661, elevation: 601 },
+    { distance: 709, elevation: 601 },
+    { distance: 747, elevation: 610 },
+    { distance: 844, elevation: 589 }, // Tramo con bajada abrupta DEM
+    { distance: 916, elevation: 598 },
+    { distance: 950, elevation: 598 },
+    { distance: 977, elevation: 589 },
+    { distance: 1047, elevation: 589 },
+    { distance: 1141, elevation: 588 },
+    { distance: 1250, elevation: 620 }
+  ];
+
+  const result = analyzeRoute({
+    points: sanCristobalSample,
+    user: { biometria: { peso: 75 } },
+    bicycle: { peso: 10, tipo: 'mtb' },
+    origen: 'Acceso Pío Nono',
+    destino: 'Cerro San Cristóbal'
+  });
+
+  assert(result.pendiente_maxima_pct <= 30, `Pendiente máx (${result.pendiente_maxima_pct}%) > 30%`);
+  assert(result.pendiente_maxima_pct >= -30, `Pendiente máx (${result.pendiente_maxima_pct}%) < -30%`);
+  assert(result.pendiente_promedio_pct <= 30, `Pendiente prom (${result.pendiente_promedio_pct}%) > 30%`);
+  assert(result.pendiente_promedio_pct >= -30, `Pendiente prom (${result.pendiente_promedio_pct}%) < -30%`);
+  assert(result.desnivel_positivo_m > 0, 'D+ debe ser positivo en San Cristóbal');
 });
 
 console.log(`\n========================================`);

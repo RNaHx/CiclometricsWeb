@@ -6,8 +6,10 @@
 const VALID_BICYCLE_TYPES = ['ruta', 'mtb', 'urbana', 'gravel'];
 const VALID_WHEEL_SIZES = ['26', '27.5', '29', '700c'];
 const VALID_GENDERS = ['masculino', 'femenino', 'otro'];
+const VALID_LEVELS = ['principiante', 'intermedio', 'avanzado', 'profesional'];
 
-function validateUser(data) {
+function validateUser(data, options = {}) {
+  const { requirePassword = false } = options;
   const errors = [];
 
   if (!data || typeof data !== 'object') {
@@ -25,12 +27,25 @@ function validateUser(data) {
     errors.push('El email es inválido.');
   }
 
+  // Password
+  if (requirePassword) {
+    if (!data.password || typeof data.password !== 'string' || data.password.trim().length < 6) {
+      errors.push('La contraseña es obligatoria y debe tener al menos 6 caracteres.');
+    }
+  } else if (data.password !== undefined && data.password !== null) {
+    if (typeof data.password !== 'string' || data.password.trim().length < 6) {
+      errors.push('La contraseña debe tener al menos 6 caracteres.');
+    }
+  }
+
   // Biometría
   const biometria = data.biometria || {};
   const peso = parseFloat(biometria.peso);
   const altura = parseFloat(biometria.altura);
   const edad = parseInt(biometria.edad, 10);
   const genero = biometria.genero ? String(biometria.genero).toLowerCase() : 'otro';
+  const nivelRaw = biometria.nivel ? String(biometria.nivel).toLowerCase().trim() : 'intermedio';
+  const nivel = VALID_LEVELS.includes(nivelRaw) ? nivelRaw : 'intermedio';
 
   if (isNaN(peso) || peso < 30 || peso > 250) {
     errors.push('El peso debe ser un número válido entre 30 kg y 250 kg.');
@@ -48,19 +63,26 @@ function validateUser(data) {
     errors.push(`El género debe ser uno de: ${VALID_GENDERS.join(', ')}.`);
   }
 
+  const sanitized = errors.length === 0 ? {
+    nombre: data.nombre.trim(),
+    email: data.email.trim().toLowerCase(),
+    biometria: {
+      peso: Math.round(peso * 10) / 10,
+      altura: Math.round(altura),
+      edad,
+      genero,
+      nivel
+    }
+  } : null;
+
+  if (sanitized && data.password) {
+    sanitized.password = String(data.password).trim();
+  }
+
   return {
     isValid: errors.length === 0,
     errors,
-    sanitized: errors.length === 0 ? {
-      nombre: data.nombre.trim(),
-      email: data.email.trim().toLowerCase(),
-      biometria: {
-        peso: Math.round(peso * 10) / 10,
-        altura: Math.round(altura),
-        edad,
-        genero
-      }
-    } : null
+    sanitized
   };
 }
 
@@ -109,17 +131,30 @@ function validateBicycle(data) {
     errors.push('El psi_max debe ser mayor a psi_min y menor o igual a 150 PSI.');
   }
 
+  const sanitized = errors.length === 0 ? {
+    tipo,
+    peso: Math.round(peso * 10) / 10,
+    rodado,
+    ancho_neumatico: Math.round(ancho),
+    psi_min: Math.round(psi_min),
+    psi_max: Math.round(psi_max)
+  } : null;
+
+  if (sanitized) {
+    if (data.nombre && typeof data.nombre === 'string' && data.nombre.trim()) {
+      sanitized.nombre = data.nombre.trim();
+    } else {
+      sanitized.nombre = `Bicicleta ${tipo.charAt(0).toUpperCase() + tipo.slice(1)} ${rodado}`;
+    }
+    if (data.userId) {
+      sanitized.userId = String(data.userId).trim();
+    }
+  }
+
   return {
     isValid: errors.length === 0,
     errors,
-    sanitized: errors.length === 0 ? {
-      tipo,
-      peso: Math.round(peso * 10) / 10,
-      rodado,
-      ancho_neumatico: Math.round(ancho),
-      psi_min: Math.round(psi_min),
-      psi_max: Math.round(psi_max)
-    } : null
+    sanitized
   };
 }
 
@@ -127,6 +162,8 @@ module.exports = {
   VALID_BICYCLE_TYPES,
   VALID_WHEEL_SIZES,
   VALID_GENDERS,
+  VALID_LEVELS,
   validateUser,
   validateBicycle
 };
+

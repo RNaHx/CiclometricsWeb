@@ -42,7 +42,10 @@ export const BIKE_PRESETS = {
   }
 };
 
+import optimalRouteVarasCristobal from './optimalRouteVarasCristobal.json';
+
 export const PRESET_ROUTES = [
+  optimalRouteVarasCristobal,
   {
     "id": "san-cristobal-el-pobre-diablo",
     "name": "Subida Cerro San Cristóbal / El Pobre Diablo",
@@ -739,15 +742,15 @@ export const PRESET_ROUTES = [
       },
       {
         "distance": 3809,
-        "elevation": 740
+        "elevation": 704
       },
       {
         "distance": 3845,
-        "elevation": 740
+        "elevation": 708
       },
       {
         "distance": 3900,
-        "elevation": 682
+        "elevation": 712
       },
       {
         "distance": 4034,

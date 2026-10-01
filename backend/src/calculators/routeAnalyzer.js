@@ -4,7 +4,10 @@
  * de MET, kCal, ETA y presiones recomendadas de neumáticos.
  */
 
-const { interpolateElevationProfile } = require('./elevationInterpolator');
+const {
+  interpolateElevationProfile,
+  smoothElevationProfile
+} = require('./elevationInterpolator');
 const { computeRouteEnergyAndETA } = require('./metCalculator');
 const { calculateRecommendedTirePressure } = require('./tirePressureCalculator');
 
@@ -86,28 +89,52 @@ function analyzeRoute({
   // Paso 2: Interpolar vacíos de elevación (Mitigación RT-02)
   const interpolatedPoints = interpolateElevationProfile(preparedPoints);
 
-  // Paso 3: Segmentar la ruta y calcular pendientes
+  // Paso 2.1: Suavizado de elevación gaussiano para eliminar ruido DEM y picos irreales (-105.5%)
+  const smoothedPoints = smoothElevationProfile(interpolatedPoints, { windowDistanceMeters: 80 });
+
+  // Paso 3: Segmentar la ruta y calcular pendientes con ventana segura
   const segments = [];
   let elevationGain = 0;
   let elevationLoss = 0;
   let maxGrade = 0;
   let minGrade = 0;
 
-  for (let i = 0; i < interpolatedPoints.length - 1; i++) {
-    const p1 = interpolatedPoints[i];
-    const p2 = interpolatedPoints[i + 1];
+  const MIN_SAFE_SLOPE_DISTANCE_M = 40; // Distancia mínima para calcular gradiente sin ruido
+  const MAX_REALISTIC_GRADE = 30.0;     // Límite físico realista máximo (rampas extremas)
+  const MIN_REALISTIC_GRADE = -30.0;    // Límite físico realista mínimo (descensos extremos)
 
-    const distStepM = Math.max(1, (p2.distance || 0) - (p1.distance || 0));
+  for (let i = 0; i < smoothedPoints.length - 1; i++) {
+    const p1 = smoothedPoints[i];
+    const p2 = smoothedPoints[i + 1];
+
+    const distStepM = Math.max(0.1, (p2.distance || 0) - (p1.distance || 0));
     const elevDiff = (p2.elevation || 0) - (p1.elevation || 0);
 
     if (elevDiff > 0) elevationGain += elevDiff;
     if (elevDiff < 0) elevationLoss += Math.abs(elevDiff);
 
-    // Pendiente en porcentaje: (elevDiff / distStep) * 100
-    // Acotar contra picos anómalos imposibles (> 35%)
-    let gradePercent = (elevDiff / distStepM) * 100;
-    if (gradePercent > 35) gradePercent = 35;
-    if (gradePercent < -35) gradePercent = -35;
+    // Cálculo de pendiente considerando ventana de distancia mínima segura
+    let gradePercent;
+    if (distStepM >= MIN_SAFE_SLOPE_DISTANCE_M) {
+      gradePercent = (elevDiff / distStepM) * 100;
+    } else {
+      let leftIdx = i;
+      let rightIdx = i + 1;
+      while (
+        (smoothedPoints[rightIdx].distance - smoothedPoints[leftIdx].distance) < MIN_SAFE_SLOPE_DISTANCE_M &&
+        (leftIdx > 0 || rightIdx < smoothedPoints.length - 1)
+      ) {
+        if (leftIdx > 0) leftIdx--;
+        if (rightIdx < smoothedPoints.length - 1) rightIdx++;
+      }
+      const spanDist = Math.max(1, smoothedPoints[rightIdx].distance - smoothedPoints[leftIdx].distance);
+      const spanElev = smoothedPoints[rightIdx].elevation - smoothedPoints[leftIdx].elevation;
+      gradePercent = (spanElev / spanDist) * 100;
+    }
+
+    // Clamp estricto a límites físicos ciclables [-30%, +30%]
+    if (gradePercent > MAX_REALISTIC_GRADE) gradePercent = MAX_REALISTIC_GRADE;
+    if (gradePercent < MIN_REALISTIC_GRADE) gradePercent = MIN_REALISTIC_GRADE;
 
     if (gradePercent > maxGrade) maxGrade = gradePercent;
     if (gradePercent < minGrade) minGrade = gradePercent;
@@ -138,9 +165,11 @@ function analyzeRoute({
   });
 
   const finalDistanceKm = energyAndEta.distanceKm;
-  const avgGrade = finalDistanceKm > 0
+  let avgGrade = finalDistanceKm > 0
     ? ((elevationGain - elevationLoss) / (finalDistanceKm * 1000)) * 100
     : 0;
+  if (avgGrade > MAX_REALISTIC_GRADE) avgGrade = MAX_REALISTIC_GRADE;
+  if (avgGrade < MIN_REALISTIC_GRADE) avgGrade = MIN_REALISTIC_GRADE;
 
   return {
     origen,
@@ -158,8 +187,8 @@ function analyzeRoute({
     psi_trasero_recomendado: tirePressure.recommendation.rear.psi,
     presiones_detalle: tirePressure,
     desglose_tramos: energyAndEta.breakdown,
-    puntos_interpolados_count: interpolatedPoints.length,
-    perfil_altimetrico: interpolatedPoints.map((pt) => ({
+    puntos_interpolados_count: smoothedPoints.length,
+    perfil_altimetrico: smoothedPoints.map((pt) => ({
       distancia_m: Math.round(pt.distance),
       elevacion_m: pt.elevation,
       interpolado: !!pt.interpolated

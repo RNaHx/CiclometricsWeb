@@ -121,6 +121,115 @@ async function runApiIntegrationTests() {
     assert(invalidData.details.length > 0);
     console.log('  [PASS] POST /api/profile valida datos erróneos y responde 400 Bad Request');
 
+    // 6. POST /api/auth/register (registro de usuario nuevo)
+    const testEmail = `testuser_${Date.now()}@ciclometrics.cl`;
+    const registerRes = await fetch(`${baseUrl}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nombre: 'Usuario Prueba',
+        email: testEmail,
+        password: 'securePass123',
+        biometria: {
+          peso: 72,
+          altura: 175,
+          edad: 28,
+          genero: 'masculino',
+          nivel: 'intermedio'
+        }
+      })
+    });
+    const registerData = await registerRes.json();
+    assert.strictEqual(registerRes.status, 201);
+    assert.strictEqual(registerData.success, true);
+    assert(registerData.data.token, 'Debe devolver un token de sesión');
+    assert.strictEqual(registerData.data.user.email, testEmail);
+    console.log('  [PASS] POST /api/auth/register registra nuevo usuario y retorna token');
+
+    // 7. POST /api/auth/login con credenciales erróneas -> 401
+    const badLoginRes = await fetch(`${baseUrl}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: testEmail,
+        password: 'wrongPassword'
+      })
+    });
+    assert.strictEqual(badLoginRes.status, 401);
+    console.log('  [PASS] POST /api/auth/login rechaza credenciales incorrectas (401)');
+
+    // 8. POST /api/auth/login con usuario preconfigurado Ricardo Henríquez
+    const ricardoLoginRes = await fetch(`${baseUrl}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: 'ricardo@ciclometrics.cl',
+        password: 'password123'
+      })
+    });
+    const ricardoLoginData = await ricardoLoginRes.json();
+    assert.strictEqual(ricardoLoginRes.status, 200);
+    assert.strictEqual(ricardoLoginData.success, true);
+    assert.strictEqual(ricardoLoginData.data.user.id, 'user-ricardo-1');
+    assert.strictEqual(ricardoLoginData.data.user.nombre, 'Ricardo Henríquez');
+    assert.strictEqual(ricardoLoginData.data.user.biometria.peso, 75);
+    const ricardoToken = ricardoLoginData.data.token;
+    console.log('  [PASS] POST /api/auth/login autentica a Ricardo Henríquez');
+
+    // 9. GET /api/auth/me usando token de autorización
+    const meRes = await fetch(`${baseUrl}/auth/me`, {
+      headers: { Authorization: `Bearer ${ricardoToken}` }
+    });
+    const meData = await meRes.json();
+    assert.strictEqual(meRes.status, 200);
+    assert.strictEqual(meData.data.id, 'user-ricardo-1');
+    assert.strictEqual(meData.data.email, 'ricardo@ciclometrics.cl');
+    console.log('  [PASS] GET /api/auth/me resuelve usuario actual con Bearer token');
+
+    // 10. GET /api/bicycles filtrado por userId
+    const bikesRes = await fetch(`${baseUrl}/bicycles?userId=user-ricardo-1`);
+    const bikesData = await bikesRes.json();
+    assert.strictEqual(bikesRes.status, 200);
+    assert.strictEqual(bikesData.success, true);
+    assert(bikesData.data.length >= 1, 'Ricardo debe tener al menos 1 bicicleta asociada');
+    const ricardoBike = bikesData.data.find((b) => b.id === 'bike-ricardo-1' || b.nombre.includes('Aro 29'));
+    assert(ricardoBike, 'Debe existir la bicicleta preconfigurada Aro 29');
+    console.log('  [PASS] GET /api/bicycles?userId=... devuelve las bicicletas del usuario');
+
+    // 11. POST /api/bicycles (crear nueva bicicleta para Ricardo)
+    const newBikeRes = await fetch(`${baseUrl}/bicycles`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${ricardoToken}`
+      },
+      body: JSON.stringify({
+        nombre: 'Gravel de Competición',
+        tipo: 'gravel',
+        peso: 9.2,
+        rodado: '700c',
+        ancho_neumatico: 40,
+        psi_min: 35,
+        psi_max: 65,
+        userId: 'user-ricardo-1'
+      })
+    });
+    const newBikeData = await newBikeRes.json();
+    assert.strictEqual(newBikeRes.status, 201);
+    assert.strictEqual(newBikeData.success, true);
+    assert.strictEqual(newBikeData.data.nombre, 'Gravel de Competición');
+    const createdBikeId = newBikeData.data.id;
+    console.log('  [PASS] POST /api/bicycles registra una nueva bicicleta');
+
+    // 12. DELETE /api/bicycles/:id (eliminar bicicleta recién creada)
+    const deleteBikeRes = await fetch(`${baseUrl}/bicycles/${createdBikeId}`, {
+      method: 'DELETE'
+    });
+    const deleteBikeData = await deleteBikeRes.json();
+    assert.strictEqual(deleteBikeRes.status, 200);
+    assert.strictEqual(deleteBikeData.success, true);
+    console.log('  [PASS] DELETE /api/bicycles/:id elimina la bicicleta especificada');
+
     console.log('\nTodas las pruebas de integración API finalizaron con éxito.\n');
   } finally {
     server.close();

@@ -6,6 +6,8 @@
 const express = require('express');
 const router = express.Router();
 
+const authController = require('../controllers/authController');
+const bicycleController = require('../controllers/bicycleController');
 const profileController = require('../controllers/profileController');
 const routeController = require('../controllers/routeController');
 
@@ -18,6 +20,16 @@ router.get('/health', (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
+
+// Endpoints de autenticación y sesión
+router.post('/auth/register', authController.register);
+router.post('/auth/login', authController.login);
+router.get('/auth/me', authController.me);
+
+// Endpoints de CRUD de bicicletas
+router.get('/bicycles', bicycleController.getBicycles);
+router.post('/bicycles', bicycleController.createBicycle);
+router.delete('/bicycles/:id', bicycleController.deleteBicycle);
 
 // Endpoints de perfil biométrico y bicicleta
 router.post('/profile', profileController.saveProfile);

@@ -23,6 +23,21 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Montaje de rutas API
 app.use('/api', apiRoutes);
 
+// Servir frontend compilado si existe en frontend/dist
+const path = require('path');
+const fs = require('fs');
+const frontendDistPath = path.resolve(__dirname, '../../frontend/dist');
+
+if (fs.existsSync(frontendDistPath)) {
+  app.use(express.static(frontendDistPath));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) {
+      return next();
+    }
+    res.sendFile(path.join(frontendDistPath, 'index.html'));
+  });
+}
+
 // Manejador de ruta 404
 app.use((req, res) => {
   res.status(404).json({
