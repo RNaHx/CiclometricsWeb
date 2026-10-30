@@ -266,11 +266,56 @@ async function resetPassword(req, res) {
   }
 }
 
+async function saveCookieConsent(req, res) {
+  try {
+    const { userId: bodyUserId, email, consent = 'accepted' } = req.body || {};
+    const resolvedUserId = bodyUserId || extractUserIdFromRequest(req);
+
+    let targetUser = null;
+    if (resolvedUserId) {
+      targetUser = await defaultStore.findById('users', resolvedUserId);
+    }
+    if (!targetUser && email) {
+      const cleanEmail = String(email).trim().toLowerCase();
+      const matches = await defaultStore.find(
+        'users',
+        (u) => u.email && u.email.toLowerCase() === cleanEmail
+      );
+      targetUser = matches[0] || null;
+    }
+
+    if (!targetUser) {
+      return res.status(404).json({
+        success: false,
+        error: 'Usuario no encontrado para registrar consentimiento de cookies.'
+      });
+    }
+
+    const updatedUser = await defaultStore.update('users', targetUser.id, {
+      cookieConsent: consent === 'session_only' ? 'session_only' : 'accepted',
+      cookieConsentAt: new Date().toISOString()
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Preferencia de cookies guardada exitosamente.',
+      data: sanitizeUserResponse(updatedUser)
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: 'Error interno al guardar preferencia de cookies.',
+      details: error.message
+    });
+  }
+}
+
 module.exports = {
   generateToken,
   extractUserIdFromRequest,
   register,
   login,
   me,
-  resetPassword
+  resetPassword,
+  saveCookieConsent
 };

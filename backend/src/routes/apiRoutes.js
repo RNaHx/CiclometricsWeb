@@ -32,6 +32,7 @@ router.get('/health', async (req, res) => {
 router.post('/auth/register', authController.register);
 router.post('/auth/login', authController.login);
 router.post('/auth/reset-password', authController.resetPassword);
+router.post('/auth/cookie-consent', authController.saveCookieConsent);
 router.get('/auth/me', authController.me);
 
 // Endpoints de CRUD de bicicletas

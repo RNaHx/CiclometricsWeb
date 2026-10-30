@@ -152,26 +152,56 @@ export const apiService = {
   // ==========================================
   // GESTIÓN DE SESIÓN Y COOKIES DE PERSISTENCIA
   // ==========================================
-  getCookieConsent(userId) {
-    const suffix = userId ? `_${userId}` : '';
-    return (
-      getCookie(`${COOKIE_CONSENT_KEY}${suffix}`) ||
-      localStorage.getItem(`${COOKIE_CONSENT_KEY}${suffix}`) ||
-      sessionStorage.getItem(`${COOKIE_CONSENT_KEY}${suffix}`) ||
-      null
-    );
+  getCookieConsent(userOrId) {
+    const storedUser = getStoredSessionRaw()?.user;
+    const userObj = typeof userOrId === 'object' && userOrId !== null ? userOrId : storedUser;
+    const userId = typeof userOrId === 'string' ? userOrId : userObj?.id;
+    const userEmail = userObj?.email ? String(userObj.email).trim().toLowerCase() : null;
+
+    // 1. Si el objeto usuario proveniente de MongoDB ya registra cookieConsent
+    if (userObj?.cookieConsent === 'accepted' || userObj?.cookieConsent === 'session_only') {
+      return userObj.cookieConsent;
+    }
+
+    // 2. Buscar por ID de usuario, por Email o en la clave global de consentimiento
+    const candidateKeys = [];
+    if (userId) candidateKeys.push(`${COOKIE_CONSENT_KEY}_${userId}`);
+    if (userEmail) candidateKeys.push(`${COOKIE_CONSENT_KEY}_${userEmail}`);
+    candidateKeys.push(COOKIE_CONSENT_KEY);
+
+    for (const key of candidateKeys) {
+      const val =
+        getCookie(key) ||
+        localStorage.getItem(key) ||
+        sessionStorage.getItem(key);
+      if (val === 'accepted' || val === 'session_only') {
+        return val;
+      }
+    }
+
+    return null;
   },
 
   acceptCookies(userId, token, user) {
-    const suffix = userId ? `_${userId}` : '';
-    setCookie(`${COOKIE_CONSENT_KEY}${suffix}`, 'accepted', THIRTY_DAYS_SECONDS);
-    setCookie(COOKIE_CONSENT_KEY, 'accepted', THIRTY_DAYS_SECONDS);
-    localStorage.setItem(`${COOKIE_CONSENT_KEY}${suffix}`, 'accepted');
-    localStorage.setItem(COOKIE_CONSENT_KEY, 'accepted');
-
     const currentSession = this.getSession();
     const activeToken = token || currentSession.token;
-    const activeUser = user || currentSession.user;
+    const rawUser = user || currentSession.user;
+    const resolvedId = userId || rawUser?.id;
+    const resolvedEmail = rawUser?.email ? String(rawUser.email).trim().toLowerCase() : null;
+
+    const keysToPersist = [COOKIE_CONSENT_KEY];
+    if (resolvedId) keysToPersist.push(`${COOKIE_CONSENT_KEY}_${resolvedId}`);
+    if (resolvedEmail) keysToPersist.push(`${COOKIE_CONSENT_KEY}_${resolvedEmail}`);
+
+    for (const key of keysToPersist) {
+      setCookie(key, 'accepted', THIRTY_DAYS_SECONDS);
+      localStorage.setItem(key, 'accepted');
+      sessionStorage.setItem(key, 'accepted');
+    }
+
+    const activeUser = rawUser
+      ? { ...rawUser, cookieConsent: 'accepted', cookieConsentAt: new Date().toISOString() }
+      : null;
 
     if (activeToken) {
       setCookie(SESSION_KEY_TOKEN, activeToken, THIRTY_DAYS_SECONDS);
@@ -184,11 +214,32 @@ export const apiService = {
       localStorage.setItem(SESSION_KEY_USER, serialized);
       sessionStorage.setItem(SESSION_KEY_USER, serialized);
     }
+
+    // Persistir también en MongoDB (en segundo plano) para recordar en futuros inicios de sesión
+    if (resolvedId || resolvedEmail) {
+      request('/auth/cookie-consent', {
+        method: 'POST',
+        body: JSON.stringify({
+          userId: resolvedId,
+          email: resolvedEmail,
+          consent: 'accepted'
+        })
+      }).catch(() => {});
+    }
+
+    return activeUser;
   },
 
-  declinePersistentCookies(userId) {
-    const suffix = userId ? `_${userId}` : '';
-    sessionStorage.setItem(`${COOKIE_CONSENT_KEY}${suffix}`, 'session_only');
+  declinePersistentCookies(userId, user) {
+    const currentSession = this.getSession();
+    const rawUser = user || currentSession.user;
+    const resolvedId = userId || rawUser?.id;
+    const resolvedEmail = rawUser?.email ? String(rawUser.email).trim().toLowerCase() : null;
+
+    sessionStorage.setItem(COOKIE_CONSENT_KEY, 'session_only');
+    if (resolvedId) sessionStorage.setItem(`${COOKIE_CONSENT_KEY}_${resolvedId}`, 'session_only');
+    if (resolvedEmail) sessionStorage.setItem(`${COOKIE_CONSENT_KEY}_${resolvedEmail}`, 'session_only');
+
     deleteCookie(SESSION_KEY_TOKEN);
     deleteCookie(SESSION_KEY_USER);
     localStorage.removeItem(SESSION_KEY_TOKEN);
@@ -203,14 +254,15 @@ export const apiService = {
       sessionStorage.setItem(SESSION_KEY_USER, JSON.stringify(user));
     }
 
-    const consent = this.getCookieConsent(user?.id);
+    const consent = this.getCookieConsent(user);
     if (consent === 'accepted') {
       if (token) {
         setCookie(SESSION_KEY_TOKEN, token, THIRTY_DAYS_SECONDS);
         localStorage.setItem(SESSION_KEY_TOKEN, token);
       }
       if (user) {
-        const serialized = JSON.stringify(user);
+        const enrichedUser = { ...user, cookieConsent: 'accepted' };
+        const serialized = JSON.stringify(enrichedUser);
         setCookie(SESSION_KEY_USER, serialized, THIRTY_DAYS_SECONDS);
         localStorage.setItem(SESSION_KEY_USER, serialized);
       }

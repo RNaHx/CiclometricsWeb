@@ -288,6 +288,24 @@ async function runApiIntegrationTests() {
     assert.strictEqual(meData.data.email, 'ricardo@ciclometrics.cl');
     console.log('  [PASS] GET /api/auth/me resuelve usuario actual con Bearer token');
 
+    // 9.1 POST /api/auth/cookie-consent persiste preferencia de cookies en el usuario
+    const consentRes = await fetch(`${baseUrl}/auth/cookie-consent`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${ricardoToken}`
+      },
+      body: JSON.stringify({
+        userId: 'user-ricardo-1',
+        email: 'ricardo@ciclometrics.cl',
+        consent: 'accepted'
+      })
+    });
+    const consentData = await consentRes.json();
+    assert.strictEqual(consentRes.status, 200);
+    assert.strictEqual(consentData.data.cookieConsent, 'accepted');
+    console.log('  [PASS] POST /api/auth/cookie-consent persiste consentimiento de cookies en la base de datos');
+
     // 10. GET /api/bicycles filtrado por userId
     const bikesRes = await fetch(`${baseUrl}/bicycles?userId=user-ricardo-1`);
     const bikesData = await bikesRes.json();

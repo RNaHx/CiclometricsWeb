@@ -71,8 +71,17 @@ export default function App() {
 
   const [cookieConsent, setCookieConsent] = useState(() => {
     const session = apiService.getSession();
-    return session?.user?.id ? apiService.getCookieConsent(session.user.id) : null;
+    return apiService.getCookieConsent(session?.user);
   });
+
+  useEffect(() => {
+    if (currentUser) {
+      const detected = apiService.getCookieConsent(currentUser);
+      if (detected) {
+        setCookieConsent(detected);
+      }
+    }
+  }, [currentUser]);
 
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
   const [termsInitialSection, setTermsInitialSection] = useState('terms');
@@ -462,25 +471,29 @@ export default function App() {
 
   // Manejador de login exitoso
   const handleAuthSuccess = (user, token) => {
+    const detectedConsent = apiService.getCookieConsent(user);
+    setCookieConsent(detectedConsent);
     setCurrentUser(user);
     if (token) {
       apiService.saveSession(token, user);
     }
-    setCookieConsent(apiService.getCookieConsent(user.id));
-    fetchBicycles(user.id);
+    if (user?.id) {
+      fetchBicycles(user.id);
+    }
   };
 
   // Manejadores de consentimiento de cookies de sesión
   const handleAcceptCookies = () => {
-    if (!currentUser?.id) return;
     const session = apiService.getSession();
-    apiService.acceptCookies(currentUser.id, session?.token, currentUser);
+    const updatedUser = apiService.acceptCookies(currentUser?.id, session?.token, currentUser);
+    if (updatedUser) {
+      setCurrentUser(updatedUser);
+    }
     setCookieConsent('accepted');
   };
 
   const handleDeclineCookies = () => {
-    if (!currentUser?.id) return;
-    apiService.declinePersistentCookies(currentUser.id);
+    apiService.declinePersistentCookies(currentUser?.id, currentUser);
     setCookieConsent('session_only');
   };
 
