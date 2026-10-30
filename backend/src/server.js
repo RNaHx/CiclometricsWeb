@@ -40,4 +40,7 @@ if (require.main === module) {
   startServer();
 }
 
-module.exports = { startServer };
+// Exportar la instancia Express `app` por defecto para compatibilidad con Vercel Express Runtime,
+// manteniendo `startServer` accesible como propiedad nombrada.
+app.startServer = startServer;
+module.exports = app;
