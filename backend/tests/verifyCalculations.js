@@ -303,6 +303,28 @@ test('Ruta Cerro San Cristóbal (curvas cerradas y escalones DEM) no excede +-30
   assert(result.desnivel_positivo_m > 0, 'D+ debe ser positivo en San Cristóbal');
 });
 
+test('Ruta Óptima Antonio Varas -> Cerro San Cristóbal coincide con Google Maps (213m / 6m) y MyCols (6.3% máx, 818m cima)', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const varasRoute = JSON.parse(
+    fs.readFileSync(path.resolve(__dirname, '../../frontend/src/data/optimalRouteVarasCristobal.json'), 'utf8')
+  );
+
+  const result = analyzeRoute({
+    points: varasRoute.points,
+    user: { biometria: { peso: 75 } },
+    bicycle: { peso: 10, tipo: 'mtb', ancho_neumatico: 60, psi_min: 30, psi_max: 70 },
+    origen: varasRoute.origen,
+    destino: varasRoute.destino
+  });
+
+  assert.strictEqual(result.desnivel_positivo_m, 213, `Ascenso acumulado esperado 213m, recibido ${result.desnivel_positivo_m}m`);
+  assert.strictEqual(result.desnivel_negativo_m, 6, `Descenso acumulado esperado 6m, recibido ${result.desnivel_negativo_m}m`);
+  assert.strictEqual(result.pendiente_maxima_pct, 6.3, `Pendiente máxima esperada 6.3% (MyCols), recibida ${result.pendiente_maxima_pct}%`);
+  const maxElev = Math.max(...varasRoute.points.map((p) => p.elevation));
+  assert.strictEqual(maxElev, 818, `Altitud máxima en la cima esperada 818m (MyCols), recibida ${maxElev}m`);
+});
+
 console.log(`\n========================================`);
 console.log(` Resultado: ${passedTests} de ${totalTests} pruebas superadas.`);
 console.log(`========================================\n`);

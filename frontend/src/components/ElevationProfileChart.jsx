@@ -68,23 +68,21 @@ export default function ElevationProfileChart({
 
   const areaD = `${pathD} L ${getX(points[points.length - 1].distance)} ${padding.top + chartHeight} L ${getX(points[0].distance)} ${padding.top + chartHeight} Z`;
 
-  // Cálculo de pendiente con ventana espacial suavizada (60-80 metros) y acotada físicamente
+  // Cálculo de pendiente por tramo con ventana mínima de seguridad (40m) y acotada físicamente
   const getSlope = (index) => {
     if (!points || points.length < 2 || index < 0 || index >= points.length) return 0;
 
-    const currentDist = points[index].distance;
-    const targetHalfWindow = 40; // Ventana total de 80m (40m atrás, 40m adelante)
+    let startIdx = index > 0 ? index - 1 : 0;
+    let endIdx = index > 0 ? index : 1;
 
-    // Buscar límite hacia atrás
-    let startIdx = index;
-    while (startIdx > 0 && (currentDist - points[startIdx].distance) < targetHalfWindow) {
-      startIdx--;
-    }
-
-    // Buscar límite hacia adelante
-    let endIdx = index;
-    while (endIdx < points.length - 1 && (points[endIdx].distance - currentDist) < targetHalfWindow) {
-      endIdx++;
+    // Si el paso entre puntos consecutivos es menor a 40m, expandir ventana para evitar ruido puntual
+    const minSafeWindow = 40;
+    while (
+      (points[endIdx].distance - points[startIdx].distance) < minSafeWindow &&
+      (startIdx > 0 || endIdx < points.length - 1)
+    ) {
+      if (startIdx > 0) startIdx--;
+      if (endIdx < points.length - 1) endIdx++;
     }
 
     const pStart = points[startIdx];
@@ -141,13 +139,25 @@ export default function ElevationProfileChart({
   const activePoint = hoverIndex !== null ? points[hoverIndex] : null;
   const activeSlope = hoverIndex !== null ? getSlope(hoverIndex) : null;
 
-  const calculatedAscent = React.useMemo(() => {
+  const { calculatedAscent, calculatedDescent, maxSlopePct } = React.useMemo(() => {
     let gain = 0;
+    let loss = 0;
+    let maxS = 0;
     for (let i = 0; i < points.length - 1; i++) {
       const diff = points[i + 1].elevation - points[i].elevation;
+      const dDist = points[i + 1].distance - points[i].distance;
       if (diff > 0) gain += diff;
+      if (diff < 0) loss += Math.abs(diff);
+      if (dDist >= 5) {
+        const s = (diff / dDist) * 100;
+        if (s > maxS) maxS = s;
+      }
     }
-    return Math.round(gain);
+    return {
+      calculatedAscent: Math.round(gain),
+      calculatedDescent: Math.round(loss),
+      maxSlopePct: Math.min(30, Math.round(maxS * 10) / 10)
+    };
   }, [points]);
 
   return (
@@ -165,7 +175,7 @@ export default function ElevationProfileChart({
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               {points.length > 0 
-                ? `Ascenso Acumulado: ${calculatedAscent} m | Máx: ${Math.round(maxElevationRaw)} m` 
+                ? `Ascenso Acumulado: ↑ ${calculatedAscent} m · ↓ ${calculatedDescent} m | Máx: ${Math.round(maxElevationRaw)} m | Pendiente Máx: ${maxSlopePct.toFixed(1)}%` 
                 : 'Ascenso acumulado: -- m'}
             </p>
           </div>

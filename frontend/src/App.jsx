@@ -367,9 +367,9 @@ export default function App() {
 
             const getAlt = (lat, lng, progressFraction) => {
               const isHill = lat > -33.435 && lat < -33.415 && lng > -70.645 && lng < -70.615;
-              if (isHill && progressFraction > 0.4) {
-                const hProg = (progressFraction - 0.4) / 0.6;
-                return Math.round(590 + Math.pow(hProg, 1.3) * 260);
+              if (isHill && progressFraction > 0.39) {
+                const hProg = (progressFraction - 0.39) / 0.61;
+                return Math.round(630 + hProg * 188);
               }
               const eastFactor = (-70.50 - lng) / (-70.50 - -70.75);
               const northFactor = (-33.35 - lat) / (-33.35 - -33.55);

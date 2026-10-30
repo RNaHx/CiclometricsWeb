@@ -89,8 +89,17 @@ function analyzeRoute({
   // Paso 2: Interpolar vacíos de elevación (Mitigación RT-02)
   const interpolatedPoints = interpolateElevationProfile(preparedPoints);
 
-  // Paso 2.1: Suavizado de elevación gaussiano para eliminar ruido DEM y picos irreales (-105.5%)
-  const smoothedPoints = smoothElevationProfile(interpolatedPoints, { windowDistanceMeters: 80 });
+  // Paso 2.1: Suavizado de elevación gaussiano selectivo cuando existen saltos bruscos / ruido DEM (> 15%)
+  const hasDemNoise = interpolatedPoints.some((pt, idx) => {
+    if (idx === 0) return false;
+    const dDist = Math.max(1, (pt.distance || 0) - (interpolatedPoints[idx - 1].distance || 0));
+    const dElev = (pt.elevation || 0) - (interpolatedPoints[idx - 1].elevation || 0);
+    return Math.abs((dElev / dDist) * 100) > 15;
+  });
+
+  const smoothedPoints = hasDemNoise
+    ? smoothElevationProfile(interpolatedPoints, { windowDistanceMeters: 80 })
+    : interpolatedPoints;
 
   // Paso 3: Segmentar la ruta y calcular pendientes con ventana segura
   const segments = [];
