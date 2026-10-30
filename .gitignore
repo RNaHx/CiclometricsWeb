@@ -7,10 +7,11 @@ dist/
 build/
 */dist/
 
-# Environment variables
+# Environment variables (NUNCA subir al repositorio)
 .env
-.env.local
-.env.*.local
+.env.*
+**/.env
+**/.env.*
 
 # Local agent configurations & local startup scripts
 .agents/
