@@ -292,23 +292,87 @@ export const apiService = {
   // ==========================================
   // AUTENTICACIÓN Y USUARIO
   // ==========================================
+  _getAccountsRegistry() {
+    try {
+      const raw = localStorage.getItem('ciclometrics_accounts_registry');
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  },
+
+  _saveAccountToRegistry(userData) {
+    try {
+      if (!userData?.email) return;
+      const cleanEmail = String(userData.email).trim().toLowerCase();
+      const registry = this._getAccountsRegistry();
+      registry[cleanEmail] = {
+        nombre: userData.nombre || registry[cleanEmail]?.nombre || 'Ciclista',
+        email: cleanEmail,
+        password: userData.password || registry[cleanEmail]?.password,
+        acceptedTerms: true,
+        termsAcceptedAt: userData.termsAcceptedAt || new Date().toISOString(),
+        biometria: userData.biometria || registry[cleanEmail]?.biometria || {
+          peso: 75,
+          altura: 178,
+          edad: 30,
+          genero: 'masculino',
+          nivel: 'intermedio'
+        }
+      };
+      localStorage.setItem('ciclometrics_accounts_registry', JSON.stringify(registry));
+    } catch {
+      // ignorar errores de cuota localStorage
+    }
+  },
+
   async login(credentials) {
+    const cleanEmail = (credentials?.email || '').trim().toLowerCase();
+    const cleanPassword = (credentials?.password || '').trim();
+
     try {
       const response = await request('/auth/login', {
         method: 'POST',
         body: JSON.stringify(credentials)
       });
       if (response?.data?.token && response?.data?.user) {
+        this._saveAccountToRegistry({
+          ...response.data.user,
+          password: cleanPassword
+        });
         this.saveSession(response.data.token, response.data.user);
       }
       return response;
     } catch (error) {
-      // Fallback local resiliente en caso de fallo de red
+      // Si el contenedor Serverless reinició su almacenamiento efímero (/tmp),
+      // resincronizar automáticamente la cuenta si fue registrada en este navegador
+      if (error.status === 401 && cleanEmail && cleanPassword) {
+        const registry = this._getAccountsRegistry();
+        const cachedAccount = registry[cleanEmail];
+        if (cachedAccount && cachedAccount.password === cleanPassword) {
+          try {
+            const syncRes = await request('/auth/register', {
+              method: 'POST',
+              body: JSON.stringify({
+                ...cachedAccount,
+                confirmPassword: cachedAccount.password,
+                acceptedTerms: true
+              })
+            });
+            if (syncRes?.data?.token && syncRes?.data?.user) {
+              this.saveSession(syncRes.data.token, syncRes.data.user);
+              return syncRes;
+            }
+          } catch {
+            // Si el email ya existe en backend pero la contraseña no coincide, es 401 real
+          }
+        }
+      }
+
       if (error.status === 401 || error.status === 400) {
         throw error; // Credenciales inválidas devueltas por el backend
       }
       console.warn('Backend no disponible para login, recurriendo a validación resiliente local:', error);
-      const cleanEmail = (credentials?.email || '').trim().toLowerCase();
       
       // Simular login con usuario Ricardo o demo
       const user = cleanEmail === FALLBACK_DEFAULT_USER.email
@@ -337,6 +401,10 @@ export const apiService = {
         body: JSON.stringify(userData)
       });
       if (response?.data?.token && response?.data?.user) {
+        this._saveAccountToRegistry({
+          ...response.data.user,
+          password: userData.password
+        });
         this.saveSession(response.data.token, response.data.user);
       }
       return response;
@@ -357,6 +425,10 @@ export const apiService = {
           nivel: userData.biometria?.nivel || 'intermedio'
         }
       };
+      this._saveAccountToRegistry({
+        ...user,
+        password: userData.password
+      });
       const token = `token-${user.id}-${Date.now()}-local`;
       this.saveSession(token, user);
       return {
@@ -368,13 +440,38 @@ export const apiService = {
   },
 
   async resetPassword({ email, newPassword, confirmPassword }) {
+    const cleanEmail = (email || '').trim().toLowerCase();
     try {
       const response = await request('/auth/reset-password', {
         method: 'POST',
         body: JSON.stringify({ email, newPassword, confirmPassword })
       });
+      this._saveAccountToRegistry({ email: cleanEmail, password: newPassword });
       return response;
     } catch (error) {
+      // Si el contenedor efímero (/tmp) perdió el usuario pero está en el registro del navegador, recrearlo con la nueva contraseña
+      if (error.status === 404 && cleanEmail) {
+        const registry = this._getAccountsRegistry();
+        const cached = registry[cleanEmail];
+        if (cached) {
+          const syncRes = await request('/auth/register', {
+            method: 'POST',
+            body: JSON.stringify({
+              ...cached,
+              password: newPassword,
+              confirmPassword: confirmPassword || newPassword,
+              acceptedTerms: true
+            })
+          });
+          if (syncRes?.success) {
+            this._saveAccountToRegistry({ ...cached, password: newPassword });
+            return {
+              success: true,
+              message: 'Contraseña restablecida y cuenta sincronizada exitosamente.'
+            };
+          }
+        }
+      }
       if (error.status === 400 || error.status === 404) {
         throw error;
       }

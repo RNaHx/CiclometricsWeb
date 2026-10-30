@@ -230,19 +230,25 @@ class HybridStore {
     this.jsonStore = new JsonStore();
     this.mongoStore = config.mongoUri ? new MongoStore(config.mongoUri, config.mongoDbName) : null;
     this.activeStore = this.mongoStore || this.jsonStore;
+    this.lastMongoError = null;
   }
 
   async _resolveStore() {
+    if (!this.mongoStore && config.mongoUri) {
+      this.mongoStore = new MongoStore(config.mongoUri, config.mongoDbName);
+    }
+
     if (this.mongoStore) {
       try {
         await this.mongoStore.init();
         this.activeStore = this.mongoStore;
+        this.lastMongoError = null;
         return this.mongoStore;
       } catch (err) {
+        this.lastMongoError = err.message;
         console.warn(
           `[Storage] No se pudo conectar a MongoDB (${err.message}). Operando con respaldo JsonStore.`
         );
-        this.mongoStore = null;
         this.activeStore = this.jsonStore;
       }
     }
@@ -281,7 +287,12 @@ class HybridStore {
   }
 
   getEngineInfo() {
-    return this.activeStore.getEngineInfo();
+    const baseInfo = this.activeStore.getEngineInfo();
+    return {
+      ...baseInfo,
+      mongoConfigured: Boolean(config.mongoUri),
+      ...(this.lastMongoError ? { mongoError: this.lastMongoError } : {})
+    };
   }
 }
 
