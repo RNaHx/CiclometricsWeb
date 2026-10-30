@@ -12,6 +12,11 @@ build/
 .env.local
 .env.*.local
 
+# Local agent configurations & local startup scripts
+.agents/
+iniciar_local.bat
+iniciar_local.ps1
+
 # Logs
 npm-debug.log*
 yarn-debug.log*

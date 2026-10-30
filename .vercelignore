@@ -1,0 +1,8 @@
+.agents/
+docs/
+backend/tests/
+iniciar_local.bat
+iniciar_local.ps1
+*.md
+.env
+.env.local
