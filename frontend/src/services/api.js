@@ -315,11 +315,11 @@ export const apiService = {
     }
   },
 
-  async resetPassword({ email, newPassword }) {
+  async resetPassword({ email, newPassword, confirmPassword }) {
     try {
       const response = await request('/auth/reset-password', {
         method: 'POST',
-        body: JSON.stringify({ email, newPassword })
+        body: JSON.stringify({ email, newPassword, confirmPassword })
       });
       return response;
     } catch (error) {

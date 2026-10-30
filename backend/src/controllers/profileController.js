@@ -5,6 +5,18 @@
 
 const profileService = require('../services/profileService');
 
+function sanitizeProfileResult(result) {
+  if (!result) return result;
+  if (result.user) {
+    const { password, ...safeUser } = result.user;
+    return {
+      ...result,
+      user: safeUser
+    };
+  }
+  return result;
+}
+
 async function saveProfile(req, res) {
   try {
     const { user, bicycle, userId } = req.body;
@@ -25,7 +37,7 @@ async function saveProfile(req, res) {
     return res.status(200).json({
       success: true,
       message: 'Perfil guardado exitosamente.',
-      data: result
+      data: sanitizeProfileResult(result)
     });
   } catch (error) {
     const statusCode = error.status || 500;
@@ -51,7 +63,7 @@ async function getProfile(req, res) {
 
     return res.status(200).json({
       success: true,
-      data: profile
+      data: sanitizeProfileResult(profile)
     });
   } catch (error) {
     const statusCode = error.status || 500;
@@ -67,7 +79,7 @@ async function listProfiles(req, res) {
     const profiles = await profileService.getAllProfiles();
     return res.status(200).json({
       success: true,
-      data: profiles
+      data: profiles.map(sanitizeProfileResult)
     });
   } catch (error) {
     return res.status(500).json({

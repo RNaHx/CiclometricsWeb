@@ -188,7 +188,7 @@ export default function App() {
       origen: routeObj.origen || routeObj.name,
       destino: routeObj.destino || 'Destino',
       points: routeObj.points,
-      saveRoute: false
+      saveRoute: true
     };
 
     try {
@@ -436,16 +436,18 @@ export default function App() {
     }, 400);
   };
 
-  // Manejador de guardado de perfil biométrico
+  // Manejador de guardado de perfil biométrico (persiste en MongoDB vía POST /api/profile)
   const handleSaveProfile = async (newProfileData) => {
     try {
-      if (backendStatus === 'connected') {
-        const res = await apiService.saveProfile(newProfileData);
-        if (res && res.profile) {
-          setCurrentUser(res.profile.user);
-          apiService.saveSession(apiService.getSession()?.token, res.profile.user);
-          return res.profile;
+      const res = await apiService.saveProfile(newProfileData);
+      const savedData = res?.data || res?.profile;
+      if (savedData && savedData.user) {
+        setCurrentUser(savedData.user);
+        apiService.saveSession(apiService.getSession()?.token, savedData.user);
+        if (savedData.user.id) {
+          await fetchBicycles(savedData.user.id);
         }
+        return savedData;
       }
       setCurrentUser(newProfileData.user);
       apiService.saveSession(apiService.getSession()?.token, newProfileData.user);

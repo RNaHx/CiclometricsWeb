@@ -26,18 +26,22 @@ export default function ProfileModal({
 
   // Estado local para edición
   const [formData, setFormData] = useState({
-    userId: profile?.userId || null,
+    userId: profile?.userId || profile?.user?.id || null,
     user: {
+      id: profile?.user?.id || null,
       nombre: profile?.user?.nombre || 'Ciclista Activo',
       email: profile?.user?.email || 'ciclista@ciclometrics.cl',
       biometria: {
         peso: profile?.user?.biometria?.peso ?? 70,
         altura: profile?.user?.biometria?.altura ?? 175,
         edad: profile?.user?.biometria?.edad ?? 28,
-        genero: profile?.user?.biometria?.genero || 'masculino'
+        genero: profile?.user?.biometria?.genero || 'masculino',
+        nivel: profile?.user?.biometria?.nivel || 'intermedio'
       }
     },
     bicycle: {
+      id: profile?.bicycle?.id || null,
+      nombre: profile?.bicycle?.nombre || 'Bicicleta Principal',
       tipo: profile?.bicycle?.tipo || 'ruta',
       peso: profile?.bicycle?.peso ?? 8.5,
       rodado: profile?.bicycle?.rodado || '700c',
