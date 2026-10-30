@@ -42,7 +42,9 @@ Eres el **Subagente Backend** responsable de toda la lógica subyacente que no s
 
 ---
 
-## 📋 Directrices de Calidad Backend
-1. **Manejo Robusto de Errores**: Todo método de almacenamiento o validación debe capturar excepciones (`try/catch`), validar entradas y retornar respuestas consistentes con estados de éxito/error.
-2. **Idempotencia y Persistencia Limpia**: Asegúrate de que las operaciones de inicialización no corrompan datos existentes.
-3. **Contrato de Integración Claro**: Al terminar, documenta para el Orquestador y Frontend la lista de funciones disponibles, parámetros requeridos y estructura de retorno.
+## 📋 Directrices de Calidad Backend (ECC Engineering Standards)
+1. **Disciplina TDD y Preservación de Pruebas**: Al implementar nuevos endpoints o refactorizar lógica matemática en `src/calculators/`, crea o actualiza las pruebas unitarias correspondientes en `tests/verifyCalculations.js` o `tests/verifyApiEndpoints.js`. Ejecuta `npm test` antes de considerar tu tarea completada.
+2. **Invariantes Físicas Inmutables**: Consulta siempre [docs/ARCHITECTURE_STATE.md](file:///c:/Users/ricar/OneDrive/Desktop/CiclometricsWeb/docs/ARCHITECTURE_STATE.md). Nunca alteres los algoritmos de MET (Ainsworth), presión de neumáticos (Berto 40/60 con límites $[\text{psi\_min}, \text{psi\_max}]$) ni las mitigaciones de pendiente RT-02/RT-03 sin una justificación teórica explícita aprobada por el Orquestador.
+3. **Manejo Robusto de Errores y Sanitización**: Todo controlador y servicio debe validar entradas rigurosamente con `validators.js`, capturar excepciones (`try/catch`) y retornar respuestas JSON estructuradas (`{ success: boolean, data?: ..., error?: ..., details?: ... }`) con códigos HTTP semánticos (200, 201, 400, 401, 404, 500).
+4. **Idempotencia y Persistencia Atómica**: Usa el mecanismo `_withLock` y escritura temporal atómica en `jsonStore.js` para evitar corrupción de datos por concurrencia.
+5. **Contrato de Integración Claro**: Al terminar, documenta para el Orquestador y Frontend la lista de endpoints o funciones disponibles, parámetros requeridos y estructura de retorno.

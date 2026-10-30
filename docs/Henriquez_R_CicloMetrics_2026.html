@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>CicloMetrics Web - Hito 2 Seminario de Título UNAB</title>
+  <style>
+    @page {
+      size: letter;
+      margin: 2.5cm 2.5cm 2.5cm 2.5cm;
+      @bottom-right {
+        content: counter(page);
+      }
+    }
+    body {
+      font-family: "Times New Roman", Times, Georgia, serif;
+      font-size: 12pt;
+      line-height: 1.6;
+      color: #111827;
+      margin: 0;
+      padding: 2.5cm;
+      background: #ffffff;
+    }
+    @media screen {
+      body {
+        max-width: 850px;
+        margin: 20px auto;
+        padding: 40px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        border-radius: 8px;
+        background: #fafafa;
+      }
+    }
+    h1.main-title {
+      font-size: 18pt;
+      text-align: center;
+      text-transform: uppercase;
+      margin-top: 20px;
+      margin-bottom: 25px;
+      font-weight: bold;
+      color: #0f172a;
+    }
+    h2 {
+      font-size: 14pt;
+      margin-top: 35px;
+      margin-bottom: 12px;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 6px;
+      color: #1e293b;
+      page-break-after: avoid;
+    }
+    h3 {
+      font-size: 12.5pt;
+      margin-top: 25px;
+      margin-bottom: 8px;
+      color: #334155;
+      page-break-after: avoid;
+    }
+    h4 {
+      font-size: 12pt;
+      font-style: italic;
+      margin-top: 18px;
+      margin-bottom: 6px;
+      color: #475569;
+      page-break-after: avoid;
+    }
+    p {
+      text-align: justify;
+      margin-bottom: 12px;
+      text-indent: 1.25cm;
+    }
+    p strong, p em {
+      text-indent: 0;
+    }
+    ul, ol {
+      margin-left: 2cm;
+      margin-bottom: 15px;
+    }
+    li {
+      margin-bottom: 6px;
+    }
+    .table-container {
+      margin: 25px 0;
+      page-break-inside: avoid;
+    }
+    table.apa-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 10.5pt;
+      line-height: 1.4;
+      margin: 15px 0;
+    }
+    table.apa-table th {
+      border-top: 2px solid #000;
+      border-bottom: 1px solid #000;
+      padding: 8px 10px;
+      text-align: left;
+      font-weight: bold;
+      background: #f8fafc;
+    }
+    table.apa-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #e2e8f0;
+      vertical-align: top;
+    }
+    table.apa-table tbody tr:last-child td {
+      border-bottom: 2px solid #000;
+    }
+    .code-block {
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 15px;
+      border-radius: 6px;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 10pt;
+      overflow-x: auto;
+      margin: 20px 0;
+      page-break-inside: avoid;
+    }
+    pre {
+      margin: 0;
+      white-space: pre-wrap;
+    }
+    code {
+      font-family: "Courier New", Courier, monospace;
+      background: #f1f5f9;
+      color: #0f172a;
+      padding: 2px 5px;
+      border-radius: 4px;
+      font-size: 10.5pt;
+    }
+    hr.section-divider {
+      border: 0;
+      height: 1px;
+      background: #cbd5e1;
+      margin: 35px 0;
+    }
+    .page-break {
+      page-break-before: always;
+    }
+  </style>
+</head>
+<body>
+  <h1 class="main-title">Universidad Andrés Bello</h1>
+<h2>Facultad de Ingeniería — Escuela de Informática</h2>
+<h3>Carrera: Ingeniería en Computación e Informática</h3>
+<hr class="section-divider" />
+<h1 class="main-title">CicloMetrics Web: Plataforma de Planificación Inteligente de Rutas Ciclistas basada en Perfiles Biométricos y Análisis Topográfico para Optimizar el Rendimiento y Seguridad</h1>
+<h3>Trabajo de Titulación para optar al título de Ingeniero en Computación e Informática y Licenciado en Ciencias de la Ingeniería</h3>
+<p><strong>Autor:</strong> Ricardo Ignacio Henríquez Novoa  </p>
+<p><strong>Profesor Guía:</strong> Félix Gonzalo Burgos González  </p>
+<p><strong>Santiago, Chile — 04 de octubre de 2026</strong> <em>(Hito 2 - Documento Consolidado y Continuación de Hito 1)</em></p>
+<hr class="section-divider" />
+<h2>DECLARACIÓN DE ORIGINALIDAD Y USO DE INTELIGENCIA ARTIFICIAL</h2>
+<p>Quien suscribe en calidad de autor del trabajo de titulación presentado para su evaluación, declara que el contenido es original y las fuentes están debidamente acreditadas bajo Normas APA 7ª edición. Se reconoce el uso de herramientas de IA:</p>
+<div class="table-container"><table class="apa-table"><thead><tr>
+<th>Finalidad</th>
+<th>Declaración de Uso</th>
+<th>Nombre de Herramienta(s)</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>Revisión de fuentes</strong></td>
+<td>Apoyo para analizar teorías de MET y física de rodadura.</td>
+<td>• Google Gemini / Perplexity AI</td>
+</tr>
+<tr>
+<td><strong>Revisión de Redacción</strong></td>
+<td>Mejora de redacción académica y consistencia de estilo.</td>
+<td>• Google Gemini / Perplexity AI</td>
+</tr>
+<tr>
+<td><strong>Verificación de Datos</strong></td>
+<td>Validación de modelos matemáticos y tolerancias físicas.</td>
+<td>• Google Gemini / Perplexity AI</td>
+</tr>
+<tr>
+<td><strong>Generación de Códigos</strong></td>
+<td>Optimización de algoritmos de cálculo y suavizado gaussiano.</td>
+<td>• Google Antigravity / AI Studio</td>
+</tr>
+<tr>
+<td><strong>Recursos Multimediales</strong></td>
+<td>Generación de diagramas de procesos y esquemas UML.</td>
+<td>• Mermaid.ai</td>
+</tr>
+</tbody></table></div>
+<p><em>Firma del Autor:</em> _______________________________________  </p>
+<p><strong>Ricardo Ignacio Henríquez Novoa</strong> (04 de octubre de 2026)</p>
+<hr class="section-divider" />
+<h2>RESUMEN EJECUTIVO</h2>
+<p>CicloMetrics Web es una plataforma de navegación predictiva que supera las limitaciones de los sistemas convencionales (e.g., Google Maps), los cuales calculan rutas ciclistas bajo velocidades vehiculares estáticas ignorando la biometría del usuario y la mecánica de la bicicleta. </p>
+<p>En este Hito 2, se consolida la propuesta metodológica y técnica integrando tres núcleos: (1) un modelo bioenergético basado en Equivalentes Metabólicos (MET) dinámicos ponderados por micro-pendiente y masa total ($M_{\text{ciclista}} + M_{\text{bici}}$); (2) un modelo físico de presión óptima de neumáticos (regla del 15% drop de Frank Berto y Schwalbe, con reparto 40% delantero / 60% trasero acotado por seguridad); y (3) un algoritmo de suavizado altimétrico con <strong>Kernel Gaussiano adaptativo</strong> (ventana de 80 m, $\sigma \approx 32\text{ m}$) que elimina errores de discretización DEM satelital (resolviendo la anomalía de pendientes espurias de hasta $-105.5\%$) y acota los gradientes a $[-30\%, +30\%]$. Se formalizan diez Requerimientos Funcionales, seis No Funcionales, el modelamiento de datos NoSQL y los diagramas de procesos del sistema.</p>
+<hr class="section-divider" />
+<h2>CAPÍTULO I: INTRODUCCIÓN</h2>
+<h3>1.1 Contexto y Motivación</h3>
+<p>El crecimiento del ciclismo urbano en el Gran Santiago demanda herramientas que consideren el relieve geográfico y las capacidades físicas individuales. Los navegadores vehiculares genéricos asumen velocidades cinemáticas fijas (12–15 km/h), provocando fatiga imprevista en pendientes pronunciadas y aumentando el riesgo de siniestros viales.</p>
+<h3>1.2 Discusión Bibliográfica y Marco Teórico</h3>
+<ul>
+<li><strong>Gasto Calórico y MET:</strong> Ainsworth et al. (2011) definen el Equivalente Metabólico en función de la intensidad. Para obtener exactitud en ruta, los MET deben multiplicarse por la masa combinada del sistema (ciclista más bicicleta) y variar tramo a tramo según la pendiente.</li>
+<li><strong>Física Mecánica del Neumático:</strong> Berto (2007) y Schwalbe (2022) demuestran que la presión óptima produce una deflexión del 15% bajo carga estática, minimizando la resistencia a la rodadura sin sacrificar confort ni seguridad.</li>
+<li><strong>Ruido Altimétrico en DEM:</strong> Zimmermann (2020) demuestra que las APIs de elevación satelital presentan errores discretos en distancias cortas ($<30\text{ m}$), generando gradientes artificiales extremos si no se aplica un filtro espacial continuo.</li>
+</ul>
+<h3>1.3 Contribución y Trabajo a Realizar</h3>
+<p>CicloMetrics Web implementa una plataforma web integral que unifica biometría, características mecánicas de la bicicleta y topografía filtrada en un motor de cálculo predictivo previo al inicio del trayecto.</p>
+<hr class="section-divider" />
+<h2>CAPÍTULO II: IDENTIFICACIÓN DEL PROBLEMA Y OBJETIVOS</h2>
+<h3>2.1 Problemática y Diagrama de Ishikawa</h3>
+<p>La planificación ciclista actual es deficiente debido a cuatro causas raíz: algoritmos optimizados solo para automóviles, velocidades fijas sin conexión a la biometría, desconocimiento de la física del inflado y ruido digital en modelos DEM.</p>
+<div class="code-block"><pre>
+  SOFTWARE: Rutas para autos | Sin cálculo de presión mecánica
+  DATOS:    Velocidades cinemáticas fijas | Perfiles separados
+  USUARIOS: Desconocimiento técnico | Múltiples aplicaciones inconexas
+  ENTORNO:  Topografía variada en Santiago | Ruido DEM satelital
+  ===&gt; [ PLANIFICACIÓN DEFICIENTE Y FRAGMENTADA ]
+</pre></div>
+<h3>2.2 Objetivos de la Investigación</h3>
+<ul>
+<li><strong>Objetivo General:</strong> Desarrollar una aplicación web funcional para ciclistas que, integrando APIs de geolocalización, análisis topográfico y perfiles biométricos y mecánicos, entregue métricas personalizadas de esfuerzo, tiempo estimado y presiones técnicas.</li>
+<li><strong>Objetivos Específicos:</strong></li>
+</ul>
+<ol>
+<li><strong>OE-01:</strong> Diseñar y desarrollar la arquitectura cliente-servidor y almacenamiento seguro de usuarios y bicicletas.</li>
+<li><strong>OE-02:</strong> Integrar servicios geoespaciales para extracción de rutas viales y datos altimétricos precisos.</li>
+<li><strong>OE-03:</strong> Codificar el motor algorítmico de MET dinámico, suavizado gaussiano y presión de inflado.</li>
+<li><strong>OE-04:</strong> Construir una interfaz interactiva con sincronización bidireccional mapa-altimetría y panel de control.</li>
+</ol>
+<h3>2.3 Métricas de Éxito</h3>
+<ul>
+<li><strong>Almacenamiento:</strong> 100% de atributos recuperados sin inconsistencias.</li>
+<li><strong>Latencia:</strong> Trazado de ruta y perfil altimétrico en $< 2.0\text{ s}$.</li>
+<li><strong>Precisión:</strong> Margen de error en kCal $< 15\%$; pendientes acotadas a $[-30\%, +30\%]$.</li>
+<li><strong>Usabilidad:</strong> Tiempo de carga de interfaz $< 3.0\text{ s}$ en móvil y escritorio.</li>
+</ul>
+<h3>2.4 Marco Normativo</h3>
+<ul>
+<li><strong>Ley N° 19.628 / 21.719:</strong> Protección de datos personales (hashing de contraseñas con <code>bcrypt</code> y sanitización).</li>
+<li><strong>Ley N° 21.088 (Convivencia Vial):</strong> Priorización de ciclovías y vías seguras mediante perfiles ciclistas.</li>
+<li><strong>Ley N° 17.336:</strong> Respeto de licencias de software libre (MIT, OpenStreetMap, Leaflet).</li>
+</ul>
+<hr class="section-divider" />
+<h2>CAPÍTULO III: METODOLOGÍA Y GESTIÓN (BASE HITO 1)</h2>
+<ul>
+<li><strong>Marco Metodológico:</strong> SCRUM en ciclos de 2 semanas estructurado en 6 fases operativas (12 semanas totales).</li>
+<li><strong>Ruta Crítica:</strong> Infraestructura y BD (Semanas 3-4) $\rightarrow$ Integración Geoespacial (Semanas 5-7) $\rightarrow$ Motor Algorítmico (Semanas 8-9).</li>
+<li><strong>Matriz de Riesgos:</strong> RT-01 (Cuotas de APIs $\rightarrow$ migración a OpenStreetMap/OSRM); RT-02 (Ruido altimétrico $\rightarrow$ suavizado gaussiano); RT-03 (Inyección en perfiles $\rightarrow$ validación de esquemas); RT-04 (Filtración de datos $\rightarrow$ encriptación <code>bcrypt</code>).</li>
+</ul>
+<hr class="section-divider" />
+<h2>CAPÍTULO IV: PROPUESTA DE SOLUCIÓN DETALLADA (HITO 2)</h2>
+<h3>4.1 Modelo Bioenergético Dinámico (MET)</h3>
+<p>El gasto calórico total ($E_{\text{total}}$ en kCal) se calcula integrando tramo a tramo:</p>
+<p>$$E_{\text{total}} = \sum_{i=1}^{n-1} \left( \text{MET}_i \times M_{\text{sistema}} \times \Delta t_i \right)$$</p>
+<ul>
+<li>$M_{\text{sistema}} = M_{\text{usuario}} + M_{\text{bicicleta}}$ (en kg).</li>
+<li>$\Delta t_i = \frac{d_i}{1000 \cdot v_i}$ (tiempo en horas; $d_i$ en metros, $v_i$ en km/h).</li>
+<li>Valores de $\text{MET}_i$ y velocidad $v_i$ por tramo:</li>
+<li>$p_i < -2\%$ (bajada): $4.0\text{ MET}$, $35.0\text{ km/h}$.</li>
+<li>$-2\% \le p_i \le +2\%$ (plano): $6.8\text{ MET}$, $22.0\text{ km/h}$.</li>
+<li>$+2\% < p_i \le +6\%$ (subida moderada): $9.5\text{ MET}$, $14.0\text{ km/h}$.</li>
+<li>$p_i > +6\%$ (subida empinada): $13.5\text{ MET}$, $8.5\text{ km/h}$.</li>
+</ul>
+<h3>4.2 Modelo Físico de Presión de Neumáticos (Regla 15% Drop)</h3>
+<p>Distribución estática: $M_{\text{delantera}} = M_{\text{sistema}} \times 0.40$, $M_{\text{trasera}} = M_{\text{sistema}} \times 0.60$.  </p>
+<p>Presión teórica para un ancho de cubierta $w$ (en mm):</p>
+<p>$$P_{\text{cruda}} = \frac{M_{\text{eje}}}{w \times 0.038} \times 1.55 \quad [\text{PSI}]$$</p>
+<p>Acotada a los rangos certificados del fabricante: $P_{\text{recomendada}} = \min(\max(P_{\text{cruda}}, \text{PSI}_{\min}), \text{PSI}_{\max})$.</p>
+<h3>4.3 Suavizado Altimétrico con Kernel Gaussiano</h3>
+<p>Para eliminar pendientes ficticias de hasta $-105.5\%$, se aplica convolución espacial gaussiana sobre las cotas:</p>
+<p>$$h_{\text{suavizada}}(s_i) = \frac{\sum_{j=1}^{n} h_j \cdot \exp\left(-\frac{(s_j - s_i)^2}{2\sigma^2}\right)}{\sum_{j=1}^{n} \exp\left(-\frac{(s_j - s_i)^2}{2\sigma^2}\right)}$$</p>
+<ul>
+<li>Ventana espacial: $D = 80\text{ m}$; $\sigma = \frac{D}{2.5} = 32\text{ m}$.</li>
+<li>Preservación de cotas de inicio y fin mediante <em>edge blending</em>.</li>
+<li>Cálculo de pendiente con ventana mínima segura ($40\text{ m}$) y clamp estricto a $[-30\%, +30\%]$.</li>
+</ul>
+<hr class="section-divider" />
+<h2>CAPÍTULO V: ANÁLISIS DE REQUERIMIENTOS Y ARQUITECTURA (HITO 2)</h2>
+<h3>5.1 Requerimientos Funcionales (RF)</h3>
+<ul>
+<li><strong>RF-01:</strong> Autenticación y registro seguro con Bearer tokens.</li>
+<li><strong>RF-02:</strong> Gestión del garaje multi-bicicleta (CRUD).</li>
+<li><strong>RF-03:</strong> Selección de bicicleta activa con recálculo dinámico inmediato.</li>
+<li><strong>RF-04:</strong> Trazado de ruta sobre red vial ciclista real con OSRM.</li>
+<li><strong>RF-05:</strong> Extracción y suavizado gaussiano de altimetría.</li>
+<li><strong>RF-06:</strong> Cálculo predictivo de gasto calórico tramo a tramo (kCal).</li>
+<li><strong>RF-07:</strong> Estimación dinámica de tiempo de llegada (ETA).</li>
+<li><strong>RF-08:</strong> Recomendación de presiones de inflado delantera y trasera (PSI).</li>
+<li><strong>RF-09:</strong> Visualización interactiva con sincronización bidireccional mapa-SVG.</li>
+<li><strong>RF-10:</strong> Modo Cockpit de manillar para smartphone.</li>
+</ul>
+<h3>5.2 Requerimientos No Funcionales (RNF)</h3>
+<ul>
+<li><strong>RNF-01 (Rendimiento):</strong> Respuesta de análisis $< 2.0\text{ s}$ en trayectos urbanos estándar.</li>
+<li><strong>RNF-02 (Precisión):</strong> Margen de error kCal $< 15\%$; pendientes acotadas a $[-30\%, +30\%]$.</li>
+<li><strong>RNF-03 (Usabilidad):</strong> Tiempo de carga de frontend $< 3.0\text{ s}$; diseño adaptativo.</li>
+<li><strong>RNF-04 (Seguridad):</strong> Hashing <code>bcrypt</code>, exclusión de contraseñas en respuestas JSON.</li>
+<li><strong>RNF-05 (Resiliencia):</strong> Modo offline de contingencia en frontend (<code>ErrorBoundary</code>).</li>
+<li><strong>RNF-06 (Cartografía):</strong> Capas libres sin marcas de agua (CyclOSM, OSM, Esri).</li>
+</ul>
+<h3>5.3 Diagrama de Componentes de la Arquitectura</h3>
+<div class="code-block"><pre>
+  FRONTEND (React 18 + Vite + Tailwind v4)
+  [ Navbar | MetricsHeaderBar | RoutePlanningCard | BicyclesListCard ]
+  [ InteractiveMap (Leaflet)  | ElevationProfileChart (SVG) | PredictiveHud ]
+         |
+         v (REST / Bearer Token)
+  BACKEND (Node.js + Express)
+  [ authController | bicycleController | routeController | validators ]
+  [ Calculators: smoothElevationProfile (Gauss) | metCalculator | tirePressureCalculator ]
+         |                                |
+         v                                v
+  [ jsonStore (store.json) ]    [ SERVICIOS EXTERNOS: OSRM | Open-Meteo ]
+</pre></div>
+<hr class="section-divider" />
+<h2>CAPÍTULO VI: ESTRUCTURA DE DATOS Y PROCESOS (HITO 2)</h2>
+<h3>6.1 Modelamiento de Datos (NoSQL)</h3>
+<ul>
+<li><strong>Users:</strong> <code>{ id, nombre, email, password, biometria: { peso, altura, edad, nivel } }</code></li>
+<li><strong>Bicycles:</strong> <code>{ id, userId, nombre, tipo, peso, rodado, ancho_neumatico, psi_min, psi_max }</code></li>
+<li><strong>Route_Analysis:</strong> <code>{ distancia_km, tiempo_estimado_min, kcal_quemadas, desnivel_positivo_m, psi_delantero, psi_trasero, perfil_altimetrico: [{ distancia_m, elevacion_m, suavizado }] }</code></li>
+</ul>
+<h3>6.2 Flujo del Proceso Altimétrico Gaussiano</h3>
+<div class="code-block"><pre>
+[ Puntos GPS ] ---&gt; [ ¿Cotas nulas? ] --(Sí)--&gt; [ Interpolación lineal ]
+                             | (No)                    |
+                             +-------------------------+
+                             v
+                 [ Kernel Gaussiano (80 m, sigma = 32 m) ]
+                             v
+                 [ Ventana segura &gt;= 40 m y Clamp +-30% ]
+                             v
+                 [ Perfil altimétrico continuo validado ]
+</pre></div>
+<hr class="section-divider" />
+<h2>REFERENCIAS BIBLIOGRÁFICAS</h2>
+<ul>
+<li>Ainsworth, B. E., et al. (2011). 2011 Compendium of Physical Activities. <em>Medicine & Science in Sports & Exercise</em>, 43(8), 1575–1581.</li>
+<li>Berto, F. (2007). <em>Tire Pressure and Performance: The 15% Drop Rule for Bicycle Tires</em>. Vintage Bicycle Press.</li>
+<li>Chile. (1999). <em>Ley N° 19.628: Sobre protección de la vida privada</em>. Diario Oficial de Chile.</li>
+<li>Chile. (2018). <em>Ley N° 21.088: Ley de Convivencia Vial</em>. Diario Oficial de Chile.</li>
+<li>Chile. (2024). <em>Ley N° 21.719: Regula el tratamiento y protección de datos personales</em>. Diario Oficial de Chile.</li>
+<li>Sagaris, L. (2018). Citizen participation for sustainable transport in Santiago. <em>Journal of Transport Geography</em>, 67, 124–134.</li>
+<li>Schwalbe. (2022). <em>Rolling Resistance Technical White Paper</em>. Schwalbe Tires.</li>
+<li>Zimmermann, M. (2020). Accuracy of Elevation APIs for Physical Effort Estimation in Urban Cycling. <em>Proc. ICSMC</em>, 45–58.</li>
+</ul>
+</body>
+</html>

@@ -1,41 +1,47 @@
 /**
  * app.js
- * Configuración de Express para CicloMetrics Backend
+ * Configuración de Express para CicloMetrics Backend (Local y Vercel Serverless)
  */
 
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
+const fs = require('fs');
 const config = require('./config/config');
 const apiRoutes = require('./routes/apiRoutes');
 
 const app = express();
 
 // Middlewares globales
-app.use(cors({
-  origin: config.corsOrigin,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+app.use(
+  cors({
+    origin: config.corsOrigin,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id']
+  })
+);
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Montaje de rutas API
+// Montaje de rutas API bajo /api
 app.use('/api', apiRoutes);
 
-// Servir frontend compilado si existe en frontend/dist
-const path = require('path');
-const fs = require('fs');
-const frontendDistPath = path.resolve(__dirname, '../../frontend/dist');
-
-if (fs.existsSync(frontendDistPath)) {
-  app.use(express.static(frontendDistPath));
-  app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api')) {
-      return next();
-    }
-    res.sendFile(path.join(frontendDistPath, 'index.html'));
-  });
+// En entorno Serverless (Vercel), permitir resolución tanto con prefijo /api como sin él
+if (config.isServerless) {
+  app.use('/', apiRoutes);
+} else {
+  // En modo servidor tradicional, servir frontend compilado si existe en frontend/dist
+  const frontendDistPath = path.resolve(__dirname, '../../frontend/dist');
+  if (fs.existsSync(frontendDistPath)) {
+    app.use(express.static(frontendDistPath));
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api')) {
+        return next();
+      }
+      res.sendFile(path.join(frontendDistPath, 'index.html'));
+    });
+  }
 }
 
 // Manejador de ruta 404

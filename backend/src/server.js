@@ -9,14 +9,20 @@ const { defaultStore } = require('./storage/jsonStore');
 
 async function startServer() {
   try {
-    // Inicializar capa de almacenamiento persistente
+    // Inicializar capa de almacenamiento persistente (MongoDB Atlas o JSON local)
     await defaultStore.init();
-    console.log(`[Storage] Base de datos JSON inicializada en: ${config.dataFile}`);
+    const engineInfo = defaultStore.getEngineInfo();
+    if (engineInfo.engine === 'mongodb') {
+      console.log(`[Storage] Conectado a MongoDB Atlas (Base de datos: ${engineInfo.database})`);
+    } else {
+      console.log(`[Storage] Base de datos JSON local activa en: ${engineInfo.file}`);
+    }
 
     const server = app.listen(config.port, () => {
       console.log(`===============================================`);
       console.log(` CicloMetrics Backend API iniciado exitosamente `);
       console.log(` Entorno: ${config.nodeEnv}`);
+      console.log(` Motor BBDD: ${engineInfo.engine.toUpperCase()}`);
       console.log(` Puerto: ${config.port}`);
       console.log(` Base URL: http://localhost:${config.port}/api`);
       console.log(` Health: http://localhost:${config.port}/api/health`);

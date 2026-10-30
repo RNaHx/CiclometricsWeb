@@ -8,8 +8,48 @@ const VALID_WHEEL_SIZES = ['26', '27.5', '29', '700c'];
 const VALID_GENDERS = ['masculino', 'femenino', 'otro'];
 const VALID_LEVELS = ['principiante', 'intermedio', 'avanzado', 'profesional'];
 
+/**
+ * Valida que la contraseña cumpla con la política de complejidad:
+ * - Mínimo 8 caracteres
+ * - Al menos 1 letra mayúscula
+ * - Al menos 1 letra minúscula
+ * - Al menos 1 número
+ * - Al menos 1 carácter especial
+ */
+function validatePasswordStrength(password) {
+  const pwdErrors = [];
+  if (!password || typeof password !== 'string') {
+    return {
+      isValid: false,
+      errors: ['La contraseña es obligatoria.']
+    };
+  }
+
+  const clean = password.trim();
+  if (clean.length < 8) {
+    pwdErrors.push('La contraseña debe tener un mínimo de 8 caracteres.');
+  }
+  if (!/[A-Z]/.test(clean)) {
+    pwdErrors.push('La contraseña debe incluir al menos una letra mayúscula.');
+  }
+  if (!/[a-z]/.test(clean)) {
+    pwdErrors.push('La contraseña debe incluir al menos una letra minúscula.');
+  }
+  if (!/[0-9]/.test(clean)) {
+    pwdErrors.push('La contraseña debe incluir al menos un número.');
+  }
+  if (!/[\W_]/.test(clean)) {
+    pwdErrors.push('La contraseña debe incluir al menos un carácter especial (ej. !@#$%^&*).');
+  }
+
+  return {
+    isValid: pwdErrors.length === 0,
+    errors: pwdErrors
+  };
+}
+
 function validateUser(data, options = {}) {
-  const { requirePassword = false } = options;
+  const { requirePassword = false, requireTerms = false } = options;
   const errors = [];
 
   if (!data || typeof data !== 'object') {
@@ -28,14 +68,23 @@ function validateUser(data, options = {}) {
   }
 
   // Password
-  if (requirePassword) {
-    if (!data.password || typeof data.password !== 'string' || data.password.trim().length < 6) {
-      errors.push('La contraseña es obligatoria y debe tener al menos 6 caracteres.');
+  if (requirePassword || (data.password !== undefined && data.password !== null)) {
+    const pwdCheck = validatePasswordStrength(data.password);
+    if (!pwdCheck.isValid) {
+      errors.push(...pwdCheck.errors);
     }
-  } else if (data.password !== undefined && data.password !== null) {
-    if (typeof data.password !== 'string' || data.password.trim().length < 6) {
-      errors.push('La contraseña debe tener al menos 6 caracteres.');
+    if (data.confirmPassword !== undefined && data.confirmPassword !== null) {
+      if (String(data.password || '').trim() !== String(data.confirmPassword).trim()) {
+        errors.push('La confirmación de contraseña no coincide.');
+      }
     }
+  }
+
+  // Términos y condiciones
+  if (requireTerms && data.acceptedTerms !== true) {
+    errors.push('Debe aceptar los Términos y Condiciones de Uso y la Política de Tratamiento de Datos.');
+  } else if (data.acceptedTerms === false) {
+    errors.push('Debe aceptar los Términos y Condiciones de Uso y la Política de Tratamiento de Datos.');
   }
 
   // Biometría
@@ -77,6 +126,11 @@ function validateUser(data, options = {}) {
 
   if (sanitized && data.password) {
     sanitized.password = String(data.password).trim();
+  }
+
+  if (sanitized && data.acceptedTerms === true) {
+    sanitized.acceptedTerms = true;
+    sanitized.termsAcceptedAt = data.termsAcceptedAt || new Date().toISOString();
   }
 
   return {
@@ -158,12 +212,46 @@ function validateBicycle(data) {
   };
 }
 
+function validateResetPassword(data) {
+  const errors = [];
+  if (!data || typeof data !== 'object') {
+    return { isValid: false, errors: ['El cuerpo de la solicitud es obligatorio.'] };
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!data.email || typeof data.email !== 'string' || !emailRegex.test(data.email.trim())) {
+    errors.push('El correo electrónico no tiene un formato válido.');
+  }
+
+  const pwdCheck = validatePasswordStrength(data.newPassword);
+  if (!pwdCheck.isValid) {
+    errors.push(...pwdCheck.errors);
+  }
+
+  if (data.confirmPassword !== undefined && data.confirmPassword !== null) {
+    if (String(data.newPassword || '').trim() !== String(data.confirmPassword).trim()) {
+      errors.push('La confirmación de contraseña no coincide.');
+    }
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+    sanitized: {
+      email: data.email ? String(data.email).trim().toLowerCase() : '',
+      newPassword: data.newPassword ? String(data.newPassword).trim() : ''
+    }
+  };
+}
+
 module.exports = {
   VALID_BICYCLE_TYPES,
   VALID_WHEEL_SIZES,
   VALID_GENDERS,
   VALID_LEVELS,
+  validatePasswordStrength,
   validateUser,
-  validateBicycle
+  validateBicycle,
+  validateResetPassword
 };
 

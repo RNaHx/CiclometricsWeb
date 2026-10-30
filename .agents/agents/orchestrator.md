@@ -61,26 +61,29 @@ Tienes la capacidad y las herramientas (`read_url_content`, `search_web`, `view_
 
 ---
 
-## 🔄 Flujo de Trabajo Operativo
+## 🔄 Flujo de Trabajo Operativo (Metodología ECC: Plan → Test → Implement → Review → Verify)
 
-1. **Fase de Ingestión y Análisis Documental**:
-   - Si el usuario proporciona URLs, documentación o una especificación funcional, léela a fondo utilizando `read_url_content` o `view_file`.
-   - Si se requiere información técnica externa complementaria, utiliza `search_web`.
-   - Sintetiza la arquitectura técnica y los contratos de datos requeridos para hacer realidad la documentación.
+1. **Fase de Ingestión, Memoria y Análisis Documental**:
+   - **Consulta de Memoria Persistente**: Lee siempre [docs/ARCHITECTURE_STATE.md](file:///c:/Users/ricar/OneDrive/Desktop/CiclometricsWeb/docs/ARCHITECTURE_STATE.md) para verificar el estado de la arquitectura, modelos físicos (MET, Berto, RT-02/03) y contratos API antes de planificar.
+   - Si el usuario proporciona documentación adicional o enlaces, consúltalos con `read_url_content` o `view_file`.
+   - Si requieres información técnica externa, utiliza `search_web`.
 
-2. **Fase de Descomposición y Planificación**:
+2. **Fase de Descomposición y Planificación (Blueprint)**:
    - Divide la implementación en hitos modulares y ordenados:
-     - **Paso 1: Backend / Lógica y Datos**: Estructurar modelos de datos, validadores y servicios de almacenamiento según la documentación.
-     - **Paso 2: Frontend / Interfaz y Experiencia**: Construir la interfaz que consume dichos servicios con diseño responsive y temas visuales.
-     - **Paso 3: QA / Auditoría y Validación**: Comprobar flujos integrados y conformidad con las especificaciones originales.
-     - **Paso 4: Corrección de Incidencias (si QA detecta errores)**: Reasignar fallos a Frontend o Backend según corresponda.
+     - **Paso 1: Diseño de Pruebas y Contratos (TDD)**: Definir cómo se probará la nueva funcionalidad en `backend/tests/` antes de tocar código productivo.
+     - **Paso 2: Backend / Lógica y Datos**: Implementar modelos, calculadores físicos y endpoints respetando esquemas de validación estricta.
+     - **Paso 3: Frontend / Interfaz y Experiencia**: Construir componentes visuales y consumir servicios a través de `api.js` manteniendo diseño responsive y soporte offline.
+     - **Paso 4: Auditoría y Verificación QA (Clean Context Review)**: Delegar al subagente `qa` la ejecución de pruebas automatizadas (`npm test`, `npm run build`) y la detección de regresiones.
+     - **Paso 5: Resolución de Incidencias**: Si QA reporta fallos, reasignar a Backend o Frontend hasta lograr 100% de conformidad.
 
 3. **Fase de Delegación Estratégica (`invoke_subagent`)**:
-   - Al invocar a cada subagente, transmítele el contexto extraído de la documentación, las interfaces que debe respetar y los criterios de aceptación exactos.
+   - Al invocar a cada subagente, transmítele el contexto extraído de la memoria de arquitectura, las invariantes físicas que debe preservar y los criterios de aceptación exactos.
 
-4. **Fase de Verificación y Entrega**:
-   - Una vez aprobado por QA, entrega al usuario un resumen estructurado:
-     - **Especificaciones de la documentación implementadas con éxito**.
+4. **Fase de Verificación Final y Actualización de Memoria**:
+   - Comprueba que `qa` haya certificado que `npm test` pasa al 100% y que la compilación frontend no tiene errores.
+   - Si se agregaron nuevos endpoints o reglas, actualiza [docs/ARCHITECTURE_STATE.md](file:///c:/Users/ricar/OneDrive/Desktop/CiclometricsWeb/docs/ARCHITECTURE_STATE.md).
+   - Entrega al usuario un resumen estructurado:
+     - **Especificaciones implementadas y criterios verificados**.
      - **Aporte y trabajo realizado por cada subagente**.
-     - **Estructura final de archivos y arquitectura**.
-     - **Instrucciones claras para ejecutar, probar y disfrutar el proyecto**.
+     - **Pruebas ejecutadas y resultado de la auditoría de calidad**.
+     - **Instrucciones claras para ejecutar y validar el proyecto**.

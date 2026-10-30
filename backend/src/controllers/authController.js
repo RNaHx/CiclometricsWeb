@@ -4,7 +4,8 @@
  */
 
 const { defaultStore } = require('../storage/jsonStore');
-const { validateUser } = require('../models/validators');
+const { validateUser, validateResetPassword } = require('../models/validators');
+const { hashPassword, verifyPassword } = require('../services/passwordService');
 
 function generateToken(userId) {
   const timestamp = Date.now();
@@ -51,12 +52,12 @@ function sanitizeUserResponse(user) {
 
 async function register(req, res) {
   try {
-    const { nombre, email, password, biometria } = req.body || {};
+    const { nombre, email, password, confirmPassword, acceptedTerms, termsAcceptedAt, biometria } = req.body || {};
 
-    // Validar datos de entrada
+    // Validar datos de entrada (incluyendo complejidad de contraseña, confirmación y aceptación de términos)
     const validation = validateUser(
-      { nombre, email, password, biometria },
-      { requirePassword: true }
+      { nombre, email, password, confirmPassword, acceptedTerms, termsAcceptedAt, biometria },
+      { requirePassword: true, requireTerms: true }
     );
 
     if (!validation.isValid) {
@@ -82,8 +83,13 @@ async function register(req, res) {
       });
     }
 
-    // Persistir nuevo usuario
-    const newUser = await defaultStore.insert('users', sanitizedData);
+    // Persistir nuevo usuario con contraseña hasheada
+    const userToInsert = {
+      ...sanitizedData,
+      password: sanitizedData.password ? hashPassword(sanitizedData.password) : undefined
+    };
+
+    const newUser = await defaultStore.insert('users', userToInsert);
     const token = generateToken(newUser.id);
 
     return res.status(201).json({
@@ -131,12 +137,26 @@ async function login(req, res) {
 
     const user = matchingUsers[0];
 
-    // Si el usuario tiene password registrado, verificar coincidencia
-    if (user.password && user.password !== cleanPassword) {
-      return res.status(401).json({
-        success: false,
-        error: 'Credenciales inválidas. Correo o contraseña incorrectos.'
-      });
+    // Si el usuario tiene password registrado, verificar coincidencia con hash o migración
+    if (user.password) {
+      const { isValid, needsRehash } = verifyPassword(cleanPassword, user.password);
+      if (!isValid) {
+        return res.status(401).json({
+          success: false,
+          error: 'Credenciales inválidas. Correo o contraseña incorrectos.'
+        });
+      }
+
+      // Si la contraseña estaba en texto plano legado, se migra a hash con salt automáticamente
+      if (needsRehash) {
+        try {
+          await defaultStore.update('users', user.id, {
+            password: hashPassword(cleanPassword)
+          });
+        } catch (err) {
+          console.warn(`[Security] No fue posible migrar contraseña de usuario ${user.id}:`, err.message);
+        }
+      }
     }
 
     const token = generateToken(user.id);
@@ -197,10 +217,60 @@ async function me(req, res) {
   }
 }
 
+async function resetPassword(req, res) {
+  try {
+    const { email, newPassword, confirmPassword } = req.body || {};
+
+    const validation = validateResetPassword({ email, newPassword, confirmPassword });
+    if (!validation.isValid) {
+      return res.status(400).json({
+        success: false,
+        error: 'Datos de restablecimiento inválidos.',
+        details: validation.errors
+      });
+    }
+
+    const { email: cleanEmail, newPassword: cleanNewPassword } = validation.sanitized;
+
+    const matchingUsers = await defaultStore.find(
+      'users',
+      (u) => u.email && u.email.toLowerCase() === cleanEmail
+    );
+
+    if (matchingUsers.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'No se encontró ninguna cuenta asociada a este correo electrónico.'
+      });
+    }
+
+    const targetUser = matchingUsers[0];
+    const updatedUser = await defaultStore.update('users', targetUser.id, {
+      password: hashPassword(cleanNewPassword)
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Contraseña restablecida exitosamente. Ya puedes iniciar sesión con tu nueva contraseña.',
+      data: {
+        userId: updatedUser.id,
+        email: updatedUser.email
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: 'Error interno al restablecer contraseña.',
+      details: error.message
+    });
+  }
+}
+
 module.exports = {
   generateToken,
   extractUserIdFromRequest,
   register,
   login,
-  me
+  me,
+  resetPassword
 };

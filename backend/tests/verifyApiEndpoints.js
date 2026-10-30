@@ -19,12 +19,15 @@ async function runApiIntegrationTests() {
   console.log(`\nIniciando pruebas de integración API en ${baseUrl}...\n`);
 
   try {
-    // 1. GET /api/health
+    // 1. GET /api/health y validación del entrypoint Serverless de Vercel
+    const vercelHandler = require('../../api/index.js');
+    assert.strictEqual(typeof vercelHandler, 'function', 'El entrypoint api/index.js debe exportar una función Serverless');
     const healthRes = await fetch(`${baseUrl}/health`);
     const healthData = await healthRes.json();
     assert.strictEqual(healthRes.status, 200);
     assert.strictEqual(healthData.status, 'ok');
-    console.log('  [PASS] GET /api/health responde 200 OK');
+    assert(healthData.storage && healthData.storage.engine, 'GET /api/health debe reportar el motor de almacenamiento activo');
+    console.log(`  [PASS] GET /api/health responde 200 OK (Motor activo: ${healthData.storage.engine})`);
 
     // 2. POST /api/profile (guardar usuario y bicicleta)
     const profilePayload = {
@@ -121,15 +124,48 @@ async function runApiIntegrationTests() {
     assert(invalidData.details.length > 0);
     console.log('  [PASS] POST /api/profile valida datos erróneos y responde 400 Bad Request');
 
-    // 6. POST /api/auth/register (registro de usuario nuevo)
+    // 6. POST /api/auth/register (validación de contraseña débil y falta de aceptación de términos)
     const testEmail = `testuser_${Date.now()}@ciclometrics.cl`;
+
+    const weakRegisterRes = await fetch(`${baseUrl}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nombre: 'Usuario Prueba',
+        email: testEmail,
+        password: 'securePass123', // Falta carácter especial
+        confirmPassword: 'securePass123',
+        acceptedTerms: true,
+        biometria: { peso: 72, altura: 175, edad: 28, genero: 'masculino', nivel: 'intermedio' }
+      })
+    });
+    assert.strictEqual(weakRegisterRes.status, 400);
+
+    const noTermsRegisterRes = await fetch(`${baseUrl}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nombre: 'Usuario Prueba',
+        email: testEmail,
+        password: 'SecurePass123!',
+        confirmPassword: 'SecurePass123!',
+        acceptedTerms: false,
+        biometria: { peso: 72, altura: 175, edad: 28, genero: 'masculino', nivel: 'intermedio' }
+      })
+    });
+    assert.strictEqual(noTermsRegisterRes.status, 400);
+    console.log('  [PASS] POST /api/auth/register exige contraseña robusta (8+, Mayús, Minús, Núm, Especial) y aceptación de términos');
+
+    // 6.1 POST /api/auth/register (registro de usuario nuevo válido)
     const registerRes = await fetch(`${baseUrl}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         nombre: 'Usuario Prueba',
         email: testEmail,
-        password: 'securePass123',
+        password: 'SecurePass123!',
+        confirmPassword: 'SecurePass123!',
+        acceptedTerms: true,
         biometria: {
           peso: 72,
           altura: 175,
@@ -144,7 +180,15 @@ async function runApiIntegrationTests() {
     assert.strictEqual(registerData.success, true);
     assert(registerData.data.token, 'Debe devolver un token de sesión');
     assert.strictEqual(registerData.data.user.email, testEmail);
+    assert.strictEqual(registerData.data.user.acceptedTerms, true);
     console.log('  [PASS] POST /api/auth/register registra nuevo usuario y retorna token');
+
+    // 6.2 Verificación de seguridad criptográfica: la contraseña no debe estar en texto plano
+    const registeredUserInStore = await defaultStore.findById('users', registerData.data.user.id);
+    assert(registeredUserInStore.password, 'El usuario en la base de datos debe tener password');
+    assert.notStrictEqual(registeredUserInStore.password, 'SecurePass123!', 'La contraseña NUNCA debe guardarse en texto plano');
+    assert(registeredUserInStore.password.includes(':'), 'La contraseña debe almacenarse en formato criptográfico <salt>:<hash>');
+    console.log('  [PASS] Contraseñas protegidas con salt y hash criptográfico en la persistencia');
 
     // 7. POST /api/auth/login con credenciales erróneas -> 401
     const badLoginRes = await fetch(`${baseUrl}/auth/login`, {
@@ -157,6 +201,64 @@ async function runApiIntegrationTests() {
     });
     assert.strictEqual(badLoginRes.status, 401);
     console.log('  [PASS] POST /api/auth/login rechaza credenciales incorrectas (401)');
+
+    // 7.1 POST /api/auth/reset-password valida email inexistente (404) y password débil (400)
+    const resetNotFoundRes = await fetch(`${baseUrl}/auth/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: 'inexistente@correo.com',
+        newPassword: 'NuevaPassword123!'
+      })
+    });
+    assert.strictEqual(resetNotFoundRes.status, 404);
+
+    const resetBadPassRes = await fetch(`${baseUrl}/auth/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: testEmail,
+        newPassword: 'sin_mayuscula_ni_num' // Inválida según política
+      })
+    });
+    assert.strictEqual(resetBadPassRes.status, 400);
+
+    // 7.2 POST /api/auth/reset-password restablece contraseña de usuario existente
+    const resetSuccessRes = await fetch(`${baseUrl}/auth/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: testEmail,
+        newPassword: 'NewSecurePassword456!',
+        confirmPassword: 'NewSecurePassword456!'
+      })
+    });
+    const resetSuccessData = await resetSuccessRes.json();
+    assert.strictEqual(resetSuccessRes.status, 200);
+    assert.strictEqual(resetSuccessData.success, true);
+
+    // Verificar que el login con contraseña antigua falle (401)
+    const oldLoginCheck = await fetch(`${baseUrl}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: testEmail,
+        password: 'SecurePass123!'
+      })
+    });
+    assert.strictEqual(oldLoginCheck.status, 401);
+
+    // Verificar que el login con nueva contraseña funcione (200)
+    const newLoginCheck = await fetch(`${baseUrl}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: testEmail,
+        password: 'NewSecurePassword456!'
+      })
+    });
+    assert.strictEqual(newLoginCheck.status, 200);
+    console.log('  [PASS] POST /api/auth/reset-password restablece contraseña y valida nuevo acceso');
 
     // 8. POST /api/auth/login con usuario preconfigurado Ricardo Henríquez
     const ricardoLoginRes = await fetch(`${baseUrl}/auth/login`, {

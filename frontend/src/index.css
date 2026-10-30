@@ -56,3 +56,24 @@
   color: #38bdf8 !important;
 }
 
+/* Contención de scroll en modales nativos <dialog> (Modern Web Guidance) */
+dialog:modal {
+  overscroll-behavior: contain;
+}
+dialog::backdrop {
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+/* Validación diferida tras interacción (:user-invalid / :user-valid + fallback) */
+.auth-validated-input:user-invalid,
+.auth-validated-input.user-invalid-fallback {
+  border-color: #f43f5e;
+  background-color: rgba(244, 63, 94, 0.08);
+}
+
+.auth-validated-input:user-valid,
+.auth-validated-input.user-valid-fallback {
+  border-color: #10b981;
+}
+

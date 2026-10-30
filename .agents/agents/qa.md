@@ -25,25 +25,31 @@ Eres el **Subagente QA**, responsable exclusivo de la calidad, estabilidad, veri
 
 ---
 
-## 🎯 Ámbito de Pruebas
+## 🎯 Ámbito de Pruebas y Metodología de Auditoría (ECC Quality Shield)
 
-1. **Pruebas de Integración Frontend ⇄ Backend**:
-   - Comprobar que los métodos expuestos por el Backend coinciden exactamente en nombre, parámetros y tipos con las llamadas realizadas por el Frontend.
+1. **Ejecución Automatizada de Pruebas de Regresión (OBLIGATORIA)**:
+   - Toda auditoría debe comenzar ejecutando las suites de prueba automatizadas mediante `run_command`:
+     - **Backend**: `cd backend; npm test` (debe certificar tanto las 12 pruebas de cálculo físico de `verifyCalculations.js` como las pruebas de integración API de `verifyApiEndpoints.js`).
+     - **Frontend**: `cd frontend; npm run build` (debe garantizar que Vite compile sin errores sintácticos ni importaciones rotas).
+   - Si alguna prueba falla, el estado de la auditoría es automáticamente **REQUIERE CORRECCIONES ⚠️**.
+
+2. **Auditoría de Invariantes Físicas y Matemáticas**:
+   - Comprobar que ninguna modificación en `backend/src/calculators/` altere las leyes físicas establecidas en [docs/ARCHITECTURE_STATE.md](file:///c:/Users/ricar/OneDrive/Desktop/CiclometricsWeb/docs/ARCHITECTURE_STATE.md):
+     - Gasto calórico (kCal) basado en tabla MET de Ainsworth (2011) ponderado por pendiente y peso total ($M_{usuario} + M_{bici}$).
+     - Presión de neumáticos según distribución 40% delantera y 60% trasera dentro de $[psi\_min, psi\_max]$.
+     - Mitigaciones RT-02 (interpolación continua sin vacíos) y RT-03 (suavizado altimétrico sin pendientes irreales $> 30\%$).
+
+3. **Pruebas de Integración y Contratos Frontend ⇄ Backend**:
+   - Comprobar que los métodos expuestos por el Backend en `apiRoutes.js` coinciden exactamente en nombre, parámetros y tipos con las llamadas realizadas por `frontend/src/services/api.js`.
    - Detectar variables no definidas, promesas no resueltas o falta de manejo de errores (`try/catch`).
 
-2. **Pruebas de Funcionalidad y Lógica**:
-   - Validar que cada botón, formulario o acción desencadene la lógica esperada.
-   - Verificar casos límite (*edge cases*): campos vacíos, entradas numéricas negativas, textos extremadamente largos, caracteres especiales, colecciones sin elementos.
-   - Probar la persistencia: ¿se mantienen los datos tras recargar o cerrar sesión?
+4. **Casos Límite y Seguridad (Edge Cases & Validation)**:
+   - Verificar validaciones con entradas extremas o maliciosas: pesos negativos, estaturas incoherentes, presiones invertidas ($psi\_max < psi\_min$), emails mal formateados o tokens ausentes/corruptos.
 
-3. **Pruebas de Interfaz y Usabilidad (UI/UX)**:
-   - Revisar que todos los elementos sean legibles en modo claro y modo oscuro.
-   - Verificar la adaptabilidad en pantallas móviles y de escritorio.
-   - Comprobar accesibilidad básica (etiquetas `aria`, atributos `alt`, contraste de color).
-
-4. **Verificación Estática y Sintaxis**:
-   - Usar `view_file` y `grep_search` para inspeccionar el código.
-   - Ejecutar validaciones o linters mediante `run_command` si el proyecto cuenta con herramientas automatizadas.
+5. **Pruebas de Interfaz, Usabilidad y Cockpit Móvil (UI/UX)**:
+   - Revisar legibilidad en modo claro y modo oscuro (alto contraste deportivo).
+   - Verificar la adaptabilidad en pantallas móviles (interfaz optimizada de manillar).
+   - Comprobar accesibilidad básica y feedback visual en botones/modales.
 
 ---
 

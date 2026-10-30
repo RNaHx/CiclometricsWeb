@@ -11,6 +11,8 @@ import PredictiveHud from './components/PredictiveHud';
 import ProfileModal from './components/ProfileModal';
 import CockpitView from './components/CockpitView';
 import ErrorBoundary from './components/ErrorBoundary';
+import CookieConsentBanner from './components/CookieConsentBanner';
+import TermsAndPrivacyModal from './components/TermsAndPrivacyModal';
 import apiService from './services/api';
 import { PRESET_ROUTES } from './data/presetRoutes';
 import OPTIMAL_ROUTE_VARAS_CRISTOBAL from './data/optimalRouteVarasCristobal.json';
@@ -61,11 +63,19 @@ export default function App() {
     setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
   };
 
-  // 2. SESIÓN DE USUARIO AUTENTICADO
+  // 2. SESIÓN DE USUARIO AUTENTICADO Y CONSENTIMIENTO DE COOKIES
   const [currentUser, setCurrentUser] = useState(() => {
     const session = apiService.getSession();
     return session?.user || null;
   });
+
+  const [cookieConsent, setCookieConsent] = useState(() => {
+    const session = apiService.getSession();
+    return session?.user?.id ? apiService.getCookieConsent(session.user.id) : null;
+  });
+
+  const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
+  const [termsInitialSection, setTermsInitialSection] = useState('terms');
 
   // 3. ESTADO DE CONECTIVIDAD DEL BACKEND
   const [backendStatus, setBackendStatus] = useState('checking'); // 'checking' | 'connected' | 'disconnected'
@@ -454,13 +464,29 @@ export default function App() {
     if (token) {
       apiService.saveSession(token, user);
     }
+    setCookieConsent(apiService.getCookieConsent(user.id));
     fetchBicycles(user.id);
+  };
+
+  // Manejadores de consentimiento de cookies de sesión
+  const handleAcceptCookies = () => {
+    if (!currentUser?.id) return;
+    const session = apiService.getSession();
+    apiService.acceptCookies(currentUser.id, session?.token, currentUser);
+    setCookieConsent('accepted');
+  };
+
+  const handleDeclineCookies = () => {
+    if (!currentUser?.id) return;
+    apiService.declinePersistentCookies(currentUser.id);
+    setCookieConsent('session_only');
   };
 
   // Manejador de logout
   const handleLogout = () => {
     apiService.clearSession();
     setCurrentUser(null);
+    setCookieConsent(null);
     setSelectedRoute(null);
     setCalculationData(null);
   };
@@ -616,12 +642,66 @@ export default function App() {
 
       </main>
 
-      {/* FOOTER INFORMATIVO */}
-      <footer className="border-t border-slate-200 dark:border-slate-800 py-6 text-center text-xs text-slate-400 mt-auto">
+      {/* FOOTER INFORMATIVO Y ACCESO A TÉRMINOS Y PRIVACIDAD */}
+      <footer className="border-t border-slate-200 dark:border-slate-800 py-6 px-4 text-center text-xs text-slate-400 mt-auto space-y-2">
         <p>
           CicloMetrics Web — Proyecto de Tesis & Arquitectura Multi-Agente • Modelos Ainsworth et al. (2011) & Schwalbe (2022)
         </p>
+        <div className="flex flex-wrap items-center justify-center gap-3 text-[11px] font-medium">
+          <button
+            type="button"
+            onClick={() => {
+              setTermsInitialSection('terms');
+              setIsTermsModalOpen(true);
+            }}
+            className="text-emerald-600 dark:text-emerald-400 hover:underline"
+          >
+            Términos y Condiciones de Uso
+          </button>
+          <span className="text-slate-300 dark:text-slate-700">•</span>
+          <button
+            type="button"
+            onClick={() => {
+              setTermsInitialSection('privacy');
+              setIsTermsModalOpen(true);
+            }}
+            className="text-emerald-600 dark:text-emerald-400 hover:underline"
+          >
+            Política de Tratamiento de Datos (Ley N° 19.628)
+          </button>
+          <span className="text-slate-300 dark:text-slate-700">•</span>
+          <button
+            type="button"
+            onClick={() => {
+              setTermsInitialSection('cookies');
+              setIsTermsModalOpen(true);
+            }}
+            className="text-emerald-600 dark:text-emerald-400 hover:underline"
+          >
+            Política de Cookies de Sesión
+          </button>
+        </div>
       </footer>
+
+      {/* BANNER DE CONSENTIMIENTO DE COOKIES DE SESIÓN (Primera vez que inicia sesión) */}
+      {currentUser && !cookieConsent && (
+        <CookieConsentBanner
+          user={currentUser}
+          onAccept={handleAcceptCookies}
+          onDecline={handleDeclineCookies}
+          onOpenPolicy={() => {
+            setTermsInitialSection('cookies');
+            setIsTermsModalOpen(true);
+          }}
+        />
+      )}
+
+      {/* MODAL DE TÉRMINOS DE USO, PRIVACIDAD Y COOKIES (Accesible desde el Footer o Banner) */}
+      <TermsAndPrivacyModal
+        isOpen={isTermsModalOpen}
+        onClose={() => setIsTermsModalOpen(false)}
+        initialSection={termsInitialSection}
+      />
 
       {/* MODAL REGISTRO DE BICICLETA */}
       <AddBicycleModal

@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>CicloMetrics Web - Hito 2 Proyecto de Título UNAB (Segunda Vista del Prototipo)</title>
+  <style>
+    @page {
+      size: letter;
+      margin: 2.5cm 2.5cm 2.5cm 2.5cm;
+      @bottom-right {
+        content: counter(page);
+      }
+    }
+    body {
+      font-family: "Times New Roman", Times, Georgia, serif;
+      font-size: 12pt;
+      line-height: 1.6;
+      color: #111827;
+      margin: 0;
+      padding: 2.5cm;
+      background: #ffffff;
+    }
+    @media screen {
+      body {
+        max-width: 850px;
+        margin: 20px auto;
+        padding: 40px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        border-radius: 8px;
+        background: #fafafa;
+      }
+    }
+    h1.main-title {
+      font-size: 17pt;
+      text-align: center;
+      text-transform: uppercase;
+      margin-top: 20px;
+      margin-bottom: 25px;
+      font-weight: bold;
+      color: #0f172a;
+    }
+    h2 {
+      font-size: 13.5pt;
+      margin-top: 32px;
+      margin-bottom: 12px;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 6px;
+      color: #1e293b;
+      page-break-after: avoid;
+    }
+    h3 {
+      font-size: 12pt;
+      margin-top: 22px;
+      margin-bottom: 8px;
+      color: #334155;
+      page-break-after: avoid;
+    }
+    h4 {
+      font-size: 11.5pt;
+      font-style: italic;
+      margin-top: 16px;
+      margin-bottom: 6px;
+      color: #475569;
+      page-break-after: avoid;
+    }
+    p {
+      text-align: justify;
+      margin-bottom: 12px;
+      text-indent: 1.25cm;
+    }
+    p strong, p em {
+      text-indent: 0;
+    }
+    ul, ol {
+      margin-left: 2cm;
+      margin-bottom: 15px;
+    }
+    li {
+      margin-bottom: 6px;
+    }
+    .table-container {
+      margin: 25px 0;
+      page-break-inside: avoid;
+    }
+    table.apa-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 10.5pt;
+      line-height: 1.4;
+      margin: 15px 0;
+    }
+    table.apa-table th {
+      border-top: 2px solid #000;
+      border-bottom: 1px solid #000;
+      padding: 8px 10px;
+      text-align: left;
+      font-weight: bold;
+      background: #f8fafc;
+    }
+    table.apa-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #e2e8f0;
+      vertical-align: top;
+    }
+    table.apa-table tbody tr:last-child td {
+      border-bottom: 2px solid #000;
+    }
+    .code-block {
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 15px;
+      border-radius: 6px;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 9.5pt;
+      overflow-x: auto;
+      margin: 20px 0;
+      page-break-inside: avoid;
+    }
+    pre {
+      margin: 0;
+      white-space: pre-wrap;
+    }
+    code {
+      font-family: "Courier New", Courier, monospace;
+      background: #f1f5f9;
+      color: #0f172a;
+      padding: 2px 5px;
+      border-radius: 4px;
+      font-size: 10pt;
+    }
+    hr.section-divider {
+      border: 0;
+      height: 1px;
+      background: #cbd5e1;
+      margin: 30px 0;
+    }
+  </style>
+</head>
+<body>
+  <h1 class="main-title">Universidad Andrés Bello</h1>
+<h2>Facultad de Ingeniería — Escuela de Informática</h2>
+<h3>Asignatura: Proyecto de Título</h3>
+<hr class="section-divider" />
+<h1 class="main-title">INFORME TÉCNICO — HITO 2: SEGUNDA VISTA DEL PROTOTIPO</h1>
+<h2>CicloMetrics Web: Plataforma de Planificación Inteligente de Rutas Ciclistas</h2>
+<p><strong>Autor:</strong> Ricardo Ignacio Henríquez Novoa  </p>
+<p><strong>Profesor Guía:</strong> Félix Gonzalo Burgos González  </p>
+<p><strong>Repositorio GitHub:</strong> https://github.com/RNaHx/CiclometricsWeb (<code>main</code>)  </p>
+<p><strong>Fecha:</strong> 04 de octubre de 2026  </p>
+<hr class="section-divider" />
+<h2>1. RESUMEN EJECUTIVO</h2>
+<p>El presente informe técnico documenta la entrega del <strong>Hito 2 (Segunda Vista del Prototipo)</strong> del proyecto <strong>CicloMetrics Web</strong>, correspondiente a las Unidades 1 y 2 del syllabus institucional. En esta iteración (consolidada en el commit <code>1735de0</code>), se implementó la reestructuración completa de la interfaz a un <strong>layout responsivo en 2 columnas</strong>, se integró un <strong>módulo de autenticación con tokens seguros</strong>, se habilitó la <strong>gestión de garaje multi-bicicleta</strong>, se incorporó el <strong>ruteo sobre calles y ciclovías reales (OSRM)</strong> y se resolvió la anomalía de pendientes irreales ($-105.5\%$) mediante un <strong>filtro de suavizado altimétrico con Kernel Gaussiano</strong>.</p>
+<hr class="section-divider" />
+<h2>2. AVANCE DEL PROTOTIPO / MVP (SEGUNDA VISTA FUNCIONAL)</h2>
+<h3>2.1 Arquitectura Visual del Prototipo (Layout en 2 Columnas)</h3>
+<p>La segunda vista del prototipo desacopla las responsabilidades en una interfaz ergonómica:</p>
+<ul>
+<li><strong>Cintillo Superior (<code>MetricsHeaderBar.jsx</code>):</strong> Muestra en tiempo real las métricas consolidadas: Distancia (km), ETA Dinámico, Calorías (kCal), Desnivel (+m) y Presión recomendada (PSI del/tras).</li>
+<li><strong>Columna Izquierda (Control y Planificación):</strong></li>
+<li><code>RoutePlanningCard.jsx</code>: Selección de puntos de origen/destino, selector de rutas optimizadas (e.g., Campus Antonio Varas a Cerro San Cristóbal) y botón de análisis predictivo.</li>
+<li><code>BicyclesListCard.jsx</code>: Selector de bicicleta activa del garaje con recálculo automático de presiones.</li>
+<li><code>AddBicycleModal.jsx</code>: Formulario para añadir nuevas bicicletas al perfil.</li>
+<li><strong>Columna Derecha (Visualización Cartográfica y Topográfica):</strong></li>
+<li><code>RouteMapCard.jsx</code> / <code>InteractiveMap.jsx</code>: Mapa Leaflet multicapa (CyclOSM, OpenStreetMap, Esri Satellite) con trazado vial real asistido por OSRM.</li>
+<li><code>ElevationProfileChart.jsx</code>: Gráfico vectorial SVG de altimetría con sincronización bidireccional de puntero en tiempo real.</li>
+<li><code>PredictiveHud.jsx</code>: Panel de rendimiento con desglose de tramos según gradiente.</li>
+</ul>
+<h3>2.2 Historias de Usuario / Casos de Uso Implementados (Sprint 2)</h3>
+<div class="table-container"><table class="apa-table"><thead><tr>
+<th>Código</th>
+<th>Historia de Usuario</th>
+<th>Comportamiento Implementado</th>
+<th>Componente / Archivo</th>
+</tr></thead><tbody>
+<tr>
+<td><strong>HU-01</strong></td>
+<td>Autenticación y Sesiones</td>
+<td>Registro y login con contraseñas cifradas vía <code>bcrypt</code> y Bearer token de sesión persistido en <code>localStorage</code>.</td>
+<td><code>AuthModal.jsx</code><br><code>authController.js</code></td>
+</tr>
+<tr>
+<td><strong>HU-02</strong></td>
+<td>Garaje Multi-Bicicleta (CRUD)</td>
+<td>Creación, listado y eliminación de bicicletas (MTB, ruta, gravel, urbana) con pesos, rodados y anchos en mm.</td>
+<td><code>AddBicycleModal.jsx</code><br><code>bicycleController.js</code></td>
+</tr>
+<tr>
+<td><strong>HU-03</strong></td>
+<td>Recálculo Reactivo de Presiones</td>
+<td>Alternar la bicicleta activa recalcula al instante la presión óptima en PSI (40% del / 60% tras) sin reiniciar la ruta.</td>
+<td><code>BicyclesListCard.jsx</code><br><code>tirePressureCalculator.js</code></td>
+</tr>
+<tr>
+<td><strong>HU-04</strong></td>
+<td>Ruteo Real sobre Calles (OSRM)</td>
+<td>Trazado fiel sobre calzadas y ciclovías de Santiago (dataset <code>optimalRouteVarasCristobal.json</code>), evitando líneas rectas.</td>
+<td><code>InteractiveMap.jsx</code><br><code>routeService.js</code></td>
+</tr>
+<tr>
+<td><strong>HU-05</strong></td>
+<td>Suavizado Gaussiano Altimétrico</td>
+<td>Mitiga errores de DEM satelital (eliminando pendientes absurdas de $-105.5\%$) y acota gradientes al rango $[-30\%, +30\%]$.</td>
+<td><code>elevationInterpolator.js</code><br><code>routeAnalyzer.js</code></td>
+</tr>
+<tr>
+<td><strong>HU-06</strong></td>
+<td>Sincronización Mapa-Perfil</td>
+<td>Pasar el cursor sobre el gráfico SVG ubica un marcador interactivo en el mapa Leaflet en tiempo real.</td>
+<td><code>ElevationProfileChart.jsx</code><br><code>InteractiveMap.jsx</code></td>
+</tr>
+<tr>
+<td><strong>HU-07</strong></td>
+<td>Resiliencia y Modo Offline</td>
+<td>Control de errores con <code>ErrorBoundary</code> y motor físico local en frontend ante desconexión del backend.</td>
+<td><code>ErrorBoundary.jsx</code><br><code>App.jsx</code></td>
+</tr>
+</tbody></table></div>
+<hr class="section-divider" />
+<h2>3. MODELAMIENTO DE DATOS Y COMPONENTES TÉCNICOS</h2>
+<h3>3.1 Estrategia de Persistencia Atómica</h3>
+<p>El backend utiliza un almacenamiento estructurado no relacional en documentos JSON (<code>backend/src/storage/jsonStore.js</code>). Para garantizar integridad transaccional y prevenir condiciones de carrera, incorpora cerrojos asíncronos (<code>_withLock</code>) y escrituras atómicas en disco con renombrado temporal.</p>
+<h3>3.2 Esquemas de Datos (NoSQL)</h3>
+<div class="code-block"><pre>
+// 1. Colección USERS (Usuarios y Biometría)
+{
+  "id": "user-ricardo-1",
+  "nombre": "Ricardo Henríquez",
+  "email": "ricardo@ciclometrics.cl",
+  "password": "$2b$10$... (hash bcrypt)",
+  "biometria": { "peso": 75.0, "altura": 178, "edad": 30, "nivel": "intermedio" }
+}
+
+// 2. Colección BICYCLES (Garaje de Bicicletas)
+{
+  "id": "bike-ricardo-1",
+  "userId": "user-ricardo-1",
+  "nombre": "Bicicleta Gravel 700c",
+  "tipo": "gravel",
+  "peso": 10.5,
+  "rodado": "700c",
+  "ancho_neumatico": 38.0,
+  "psi_min": 35.0,
+  "psi_max": 75.0
+}
+
+// 3. Objeto de Salida ROUTE_ANALYSIS (POST /api/routes/calculate)
+{
+  "distancia_km": 8.74,
+  "tiempo_estimado_min": 32.5,
+  "velocidad_media_kmh": 16.1,
+  "desnivel_positivo_m": 298.0,
+  "pendiente_maxima": 11.4,
+  "kcal_quemadas": 384.2,
+  "psi_delantero_recomendado": 42,
+  "psi_trasero_recomendado": 63,
+  "perfil_altimetrico": [{ "distancia_m": 0, "elevacion_m": 580.2, "suavizado": true }]
+}
+</pre></div>
+<h3>3.3 Diagrama de Componentes del Sistema</h3>
+<div class="code-block"><pre>
++-----------------------------------------------------------------------------------+
+|                        ARQUITECTURA DE COMPONENTES                                |
++-----------------------------------------------------------------------------------+
+  FRONTEND (React 18 + Vite)
+  [ Navbar | MetricsHeaderBar | RoutePlanningCard | BicyclesListCard ]
+  [ InteractiveMap (Leaflet)  | ElevationProfileChart (SVG) | PredictiveHud ]
+         |
+         v (HTTP / JSON / Bearer Token)
+  BACKEND (Node.js + Express)
+  [ authController | bicycleController | routeController | validators ]
+  [ Motores: smoothElevationProfile (Gauss) | metCalculator | tirePressureCalculator ]
+         |                                |
+         v                                v
+  [ jsonStore (store.json) ]    [ SERVICIOS EXTERNOS: OSRM Router | Open-Meteo DEM ]
++-----------------------------------------------------------------------------------+
+</pre></div>
+<hr class="section-divider" />
+<h2>4. GESTIÓN DEL PROYECTO (CICLO DE VIDA Y CONFIGURACIÓN)</h2>
+<h3>4.1 Planificación Ágil (Scrum)</h3>
+<ul>
+<li><strong>Sprint 1 (Commit <code>d215dc3</code> - 30/09/2026):</strong> Arquitectura base del MVP, motores de MET y presión iniciales, mapa multicapa libre (CyclOSM/OSM/Esri).</li>
+<li><strong>Sprint 2 (Commit <code>1735de0</code> - 01/10/2026):</strong> Segunda vista del prototipo en 2 columnas, autenticación completa, garaje multi-bicicleta, ruteo ciclista OSRM y corrección de pendientes mediante Kernel Gaussiano.</li>
+</ul>
+<h3>4.2 Control de Versiones en Git / GitHub</h3>
+<ul>
+<li><strong>Repositorio:</strong> <code>https://github.com/RNaHx/CiclometricsWeb</code> (Rama: <code>main</code>).</li>
+<li><strong>Trazabilidad de Commits:</strong></li>
+<li><code>d215dc3</code>: <em>Initial release of CicloMetrics Web MVP</em> (+11.870 líneas, 54 archivos).</li>
+<li><code>1735de0</code>: <em>feat: login/register auth, 2-column layout, slope calculation fix, and real street routing</em> (+5.100 / -473 líneas, 27 archivos).</li>
+</ul>
+<h3>4.3 Gestión de la Configuración y Automatización</h3>
+<ul>
+<li><strong>Scripts de Despliegue en 1 Clic:</strong></li>
+<li><code>iniciar_local.bat</code> / <code>iniciar_local.ps1</code>: Detecta Node.js, compila el frontend si es necesario (<code>npm run build</code>), abre el navegador en <code>http://localhost:5000</code> e inicia el backend de forma automatizada.</li>
+<li><strong>Scripts en <code>package.json</code> raíz:</strong> Centraliza comandos <code>start</code>, <code>build</code>, <code>dev:frontend</code>, <code>dev:backend</code> y <code>test</code>.</li>
+<li><strong>Aseguramiento de Calidad:</strong> Ejecución de <code>npm test</code> en backend con <strong>12 de 12 pruebas aprobadas (100% PASS)</strong> en <code>verifyCalculations.js</code>, verificando que las pendientes en curvas del Cerro San Cristóbal no superan el rango físico $[-30\%, +30\%]$.</li>
+</ul>
+<hr class="section-divider" />
+<h2>5. CONCLUSIÓN Y PRÓXIMOS PASOS</h2>
+<p>La Segunda Vista del Prototipo consolida una solución funcional, ergonómica y numéricamente rigurosa. Para el Hito 3 se contempla el despliegue en servidor Cloud y pruebas de campo con ciclistas en ruta real.</p>
+</body>
+</html>

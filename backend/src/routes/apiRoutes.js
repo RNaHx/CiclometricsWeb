@@ -6,17 +6,24 @@
 const express = require('express');
 const router = express.Router();
 
+const { defaultStore } = require('../storage/jsonStore');
 const authController = require('../controllers/authController');
 const bicycleController = require('../controllers/bicycleController');
 const profileController = require('../controllers/profileController');
 const routeController = require('../controllers/routeController');
 
-// Estado y verificación de salud del servicio
-router.get('/health', (req, res) => {
+// Estado y verificación de salud del servicio y motor de base de datos (MongoDB Atlas / JSON Local)
+router.get('/health', async (req, res) => {
+  try {
+    await defaultStore.init();
+  } catch (err) {
+    console.warn('[Health] Aviso al inicializar store:', err.message);
+  }
   res.json({
     status: 'ok',
     service: 'CicloMetrics Backend API',
     version: '1.0.0',
+    storage: defaultStore.getEngineInfo(),
     timestamp: new Date().toISOString()
   });
 });
@@ -24,6 +31,7 @@ router.get('/health', (req, res) => {
 // Endpoints de autenticación y sesión
 router.post('/auth/register', authController.register);
 router.post('/auth/login', authController.login);
+router.post('/auth/reset-password', authController.resetPassword);
 router.get('/auth/me', authController.me);
 
 // Endpoints de CRUD de bicicletas

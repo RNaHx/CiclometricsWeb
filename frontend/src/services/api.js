@@ -9,6 +9,59 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 const SESSION_KEY_TOKEN = 'ciclometrics_auth_token';
 const SESSION_KEY_USER = 'ciclometrics_auth_user';
 const STORAGE_KEY_BIKES = 'ciclometrics_user_bicycles';
+const COOKIE_CONSENT_KEY = 'ciclometrics_cookie_consent';
+const THIRTY_DAYS_SECONDS = 60 * 60 * 24 * 30;
+
+// Utilidades de Cookies para mantener la sesión iniciada entre aperturas del navegador
+function setCookie(name, value, maxAgeSeconds = THIRTY_DAYS_SECONDS) {
+  if (typeof document === 'undefined') return;
+  const encoded = encodeURIComponent(value);
+  const secureFlag = window.location.protocol === 'https:' ? '; Secure' : '';
+  document.cookie = `${name}=${encoded}; path=/; max-age=${maxAgeSeconds}; SameSite=Lax${secureFlag}`;
+}
+
+function getCookie(name) {
+  if (typeof document === 'undefined' || !document.cookie) return null;
+  const cookies = document.cookie.split(';');
+  for (const cookie of cookies) {
+    const [rawKey, ...rawVal] = cookie.trim().split('=');
+    if (rawKey === name) {
+      try {
+        return decodeURIComponent(rawVal.join('='));
+      } catch {
+        return rawVal.join('=');
+      }
+    }
+  }
+  return null;
+}
+
+function deleteCookie(name) {
+  if (typeof document === 'undefined') return;
+  document.cookie = `${name}=; path=/; max-age=0; SameSite=Lax`;
+}
+
+function getStoredSessionRaw() {
+  const token =
+    getCookie(SESSION_KEY_TOKEN) ||
+    localStorage.getItem(SESSION_KEY_TOKEN) ||
+    sessionStorage.getItem(SESSION_KEY_TOKEN);
+
+  const userJson =
+    getCookie(SESSION_KEY_USER) ||
+    localStorage.getItem(SESSION_KEY_USER) ||
+    sessionStorage.getItem(SESSION_KEY_USER);
+
+  let user = null;
+  if (userJson) {
+    try {
+      user = JSON.parse(userJson);
+    } catch {
+      user = null;
+    }
+  }
+  return { token, user };
+}
 
 // Perfil de respaldo para modo offline
 const FALLBACK_DEFAULT_USER = {
@@ -43,16 +96,8 @@ const FALLBACK_DEFAULT_BIKES = [
  */
 async function request(endpoint, options = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
-  const token = localStorage.getItem(SESSION_KEY_TOKEN);
-  const userJson = localStorage.getItem(SESSION_KEY_USER);
-  let userId = null;
-  if (userJson) {
-    try {
-      userId = JSON.parse(userJson)?.id;
-    } catch (e) {
-      // Ignorar error de parsing
-    }
-  }
+  const { token, user } = getStoredSessionRaw();
+  const userId = user?.id || null;
 
   const defaultHeaders = {
     'Content-Type': 'application/json',
@@ -105,30 +150,84 @@ async function request(endpoint, options = {}) {
 
 export const apiService = {
   // ==========================================
-  // GESTIÓN DE SESIÓN LOCAL
+  // GESTIÓN DE SESIÓN Y COOKIES DE PERSISTENCIA
   // ==========================================
+  getCookieConsent(userId) {
+    const suffix = userId ? `_${userId}` : '';
+    return (
+      getCookie(`${COOKIE_CONSENT_KEY}${suffix}`) ||
+      localStorage.getItem(`${COOKIE_CONSENT_KEY}${suffix}`) ||
+      sessionStorage.getItem(`${COOKIE_CONSENT_KEY}${suffix}`) ||
+      null
+    );
+  },
+
+  acceptCookies(userId, token, user) {
+    const suffix = userId ? `_${userId}` : '';
+    setCookie(`${COOKIE_CONSENT_KEY}${suffix}`, 'accepted', THIRTY_DAYS_SECONDS);
+    setCookie(COOKIE_CONSENT_KEY, 'accepted', THIRTY_DAYS_SECONDS);
+    localStorage.setItem(`${COOKIE_CONSENT_KEY}${suffix}`, 'accepted');
+    localStorage.setItem(COOKIE_CONSENT_KEY, 'accepted');
+
+    const currentSession = this.getSession();
+    const activeToken = token || currentSession.token;
+    const activeUser = user || currentSession.user;
+
+    if (activeToken) {
+      setCookie(SESSION_KEY_TOKEN, activeToken, THIRTY_DAYS_SECONDS);
+      localStorage.setItem(SESSION_KEY_TOKEN, activeToken);
+      sessionStorage.setItem(SESSION_KEY_TOKEN, activeToken);
+    }
+    if (activeUser) {
+      const serialized = JSON.stringify(activeUser);
+      setCookie(SESSION_KEY_USER, serialized, THIRTY_DAYS_SECONDS);
+      localStorage.setItem(SESSION_KEY_USER, serialized);
+      sessionStorage.setItem(SESSION_KEY_USER, serialized);
+    }
+  },
+
+  declinePersistentCookies(userId) {
+    const suffix = userId ? `_${userId}` : '';
+    sessionStorage.setItem(`${COOKIE_CONSENT_KEY}${suffix}`, 'session_only');
+    deleteCookie(SESSION_KEY_TOKEN);
+    deleteCookie(SESSION_KEY_USER);
+    localStorage.removeItem(SESSION_KEY_TOKEN);
+    localStorage.removeItem(SESSION_KEY_USER);
+  },
+
   saveSession(token, user) {
-    if (token) localStorage.setItem(SESSION_KEY_TOKEN, token);
-    if (user) localStorage.setItem(SESSION_KEY_USER, JSON.stringify(user));
+    if (token) {
+      sessionStorage.setItem(SESSION_KEY_TOKEN, token);
+    }
+    if (user) {
+      sessionStorage.setItem(SESSION_KEY_USER, JSON.stringify(user));
+    }
+
+    const consent = this.getCookieConsent(user?.id);
+    if (consent === 'accepted') {
+      if (token) {
+        setCookie(SESSION_KEY_TOKEN, token, THIRTY_DAYS_SECONDS);
+        localStorage.setItem(SESSION_KEY_TOKEN, token);
+      }
+      if (user) {
+        const serialized = JSON.stringify(user);
+        setCookie(SESSION_KEY_USER, serialized, THIRTY_DAYS_SECONDS);
+        localStorage.setItem(SESSION_KEY_USER, serialized);
+      }
+    }
   },
 
   getSession() {
-    const token = localStorage.getItem(SESSION_KEY_TOKEN);
-    const userJson = localStorage.getItem(SESSION_KEY_USER);
-    let user = null;
-    if (userJson) {
-      try {
-        user = JSON.parse(userJson);
-      } catch (e) {
-        user = null;
-      }
-    }
-    return { token, user };
+    return getStoredSessionRaw();
   },
 
   clearSession() {
+    deleteCookie(SESSION_KEY_TOKEN);
+    deleteCookie(SESSION_KEY_USER);
     localStorage.removeItem(SESSION_KEY_TOKEN);
     localStorage.removeItem(SESSION_KEY_USER);
+    sessionStorage.removeItem(SESSION_KEY_TOKEN);
+    sessionStorage.removeItem(SESSION_KEY_USER);
   },
 
   // ==========================================
@@ -212,6 +311,25 @@ export const apiService = {
         success: true,
         message: 'Usuario registrado exitosamente (Modo Offline)',
         data: { token, user }
+      };
+    }
+  },
+
+  async resetPassword({ email, newPassword }) {
+    try {
+      const response = await request('/auth/reset-password', {
+        method: 'POST',
+        body: JSON.stringify({ email, newPassword })
+      });
+      return response;
+    } catch (error) {
+      if (error.status === 400 || error.status === 404) {
+        throw error;
+      }
+      console.warn('Backend no disponible para resetPassword, simulando en modo offline:', error);
+      return {
+        success: true,
+        message: 'Contraseña actualizada en modo local/offline.'
       };
     }
   },
