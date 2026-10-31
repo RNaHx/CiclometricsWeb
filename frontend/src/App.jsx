@@ -313,37 +313,179 @@ export default function App() {
     }
   }, [selectedRoute, activeProfile, calculateMetrics]);
 
+  // Geocodificador de direcciones y hitos ciclistas (Nominatim OSM + Photon + Hitos RM)
+  const geocodeAddress = async (rawAddress) => {
+    if (!rawAddress || !rawAddress.trim()) return null;
+    const text = rawAddress.trim();
+    const norm = text
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+
+    // 1. Coordenadas directas escritas como "-33.4349, -70.6151"
+    const coordMatch = text.match(/^(-?\d+(?:\.\d+)?)\s*[,;\s]\s*(-?\d+(?:\.\d+)?)$/);
+    if (coordMatch) {
+      return [parseFloat(coordMatch[1]), parseFloat(coordMatch[2])];
+    }
+
+    // 2. Hitos ciclistas y puntos emblemáticos de Santiago / RM (evita ambigüedad con calles homónimas)
+    if (norm.includes('cerro san cristobal') || norm.includes('cumbre san cristobal') || norm.includes('parque metropolitano')) {
+      return [-33.42401, -70.63262];
+    }
+    if (norm.includes('antonio varas') && (norm.includes('810') || !/\d/.test(norm))) {
+      return [-33.4349, -70.61513];
+    }
+    if (norm.includes('cuesta la dormida')) {
+      return [-33.0560, -71.0080];
+    }
+    if (norm.includes('templo bahai') || norm.includes('bahai')) {
+      return [-33.4764, -70.5117];
+    }
+    if (norm.includes('farellones')) {
+      return [-33.3508, -70.3129];
+    }
+    if (norm.includes('valle nevado')) {
+      return [-33.3547, -70.2494];
+    }
+    if (norm.includes('parque bicentenario') && !/\d/.test(norm)) {
+      return [-33.4015, -70.6020];
+    }
+    if (norm.includes('costanera center') || norm.includes('tobalaba')) {
+      if (!/\d/.test(norm)) return [-33.4177, -70.6068];
+    }
+    if (norm.includes('plaza de armas') && !/\d/.test(norm)) {
+      return [-33.4378, -70.6505];
+    }
+    if (norm.includes('plaza baquedano') || norm.includes('plaza italia')) {
+      return [-33.4370, -70.6344];
+    }
+
+    // 3. Consulta Nominatim OpenStreetMap (con variantes de búsqueda en Chile)
+    const cleanText = text.replace(/,\s*provincia de [\w\sáéíóúñ]+/i, '').trim();
+    const queries = [
+      cleanText.toLowerCase().includes('chile') ? cleanText : `${cleanText}, Chile`,
+      text.toLowerCase().includes('chile') ? text : `${text}, Región Metropolitana, Chile`,
+      // Variante sin número de puerta por si la numeración exacta no está indexada en OSM
+      `${cleanText.replace(/\b\d{2,6}\b/g, '').replace(/\s+/g, ' ').trim()}, Chile`
+    ];
+
+    for (const q of queries) {
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=cl&limit=1`;
+        const res = await fetch(url, {
+          headers: { 'Accept-Language': 'es' }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0 && data[0].lat && data[0].lon) {
+            return [parseFloat(parseFloat(data[0].lat).toFixed(5)), parseFloat(parseFloat(data[0].lon).toFixed(5))];
+          }
+        }
+      } catch (err) {
+        console.warn('Nominatim geocoding fallback:', err);
+      }
+    }
+
+    // 4. Respaldo con Photon (Komoot OSM Geocoder)
+    try {
+      const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(cleanText + ', Chile')}&limit=1`;
+      const res = await fetch(photonUrl);
+      if (res.ok) {
+        const data = await res.json();
+        const coords = data?.features?.[0]?.geometry?.coordinates;
+        if (Array.isArray(coords) && coords.length >= 2) {
+          return [parseFloat(coords[1].toFixed(5)), parseFloat(coords[0].toFixed(5))];
+        }
+      }
+    } catch (err) {
+      console.warn('Photon geocoding fallback:', err);
+    }
+
+    // 5. Respaldo por comuna de la Región Metropolitana si la calle específica no aparece
+    const comunasRM = {
+      'san bernardo': [-33.5922, -70.6996],
+      'providencia': [-33.4314, -70.6093],
+      'santiago': [-33.4489, -70.6693],
+      'las condes': [-33.4117, -70.5665],
+      'vitacura': [-33.3867, -70.5750],
+      'nuñoa': [-33.4569, -70.5978],
+      'nunoa': [-33.4569, -70.5978],
+      'la reina': [-33.4431, -70.5344],
+      'peñalolen': [-33.4861, -70.5333],
+      'penalolen': [-33.4861, -70.5333],
+      'la florida': [-33.5228, -70.5983],
+      'puente alto': [-33.6117, -70.5758],
+      'maipu': [-33.5106, -70.7572],
+      'recoleta': [-33.4061, -70.6425],
+      'independencia': [-33.4153, -70.6644],
+      'san miguel': [-33.4986, -70.6514],
+      'la cisterna': [-33.5347, -70.6628],
+      'el bosque': [-33.5625, -70.6750],
+      'estacion central': [-33.4592, -70.6989],
+      'pudahuel': [-33.4411, -70.7664],
+      'quilicura': [-33.3619, -70.7289],
+      'huechuraba': [-33.3736, -70.6369],
+      'lo barnechea': [-33.3519, -70.5178],
+      'macul': [-33.4889, -70.5992],
+      'san joaquin': [-33.4969, -70.6275]
+    };
+    for (const [comuna, cCoords] of Object.entries(comunasRM)) {
+      if (norm.includes(comuna)) {
+        return cCoords;
+      }
+    }
+
+    return null;
+  };
+
   // Manejador del botón [Calcular Ruta Óptima]
-  const handleCalculateRoutePlan = async ({ type, origen, destino, origenCoords, destinoCoords, bikeId }) => {
+  const handleCalculateRoutePlan = async ({ type, origen, destino, origenCoords, destinoCoords }) => {
     setIsCalculating(true);
-    
-    // Si la búsqueda incluye Varas / San Cristóbal, activar la ruta real con 417 coordenadas viales OSRM
-    const isVarasCristobal = 
-      (origen && origen.toLowerCase().includes('varas')) ||
-      (destino && (destino.toLowerCase().includes('cristóbal') || destino.toLowerCase().includes('cristobal'))) ||
+
+    const normOrigen = (origen || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const normDestino = (destino || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+    // Solo usar la ruta predefinida calibrada cuando TANTO el origen es Antonio Varas COMO el destino es Cerro San Cristóbal
+    const isExactVarasCristobal =
+      (type === 'direcciones' &&
+        normOrigen.includes('varas') &&
+        normDestino.includes('cristobal')) ||
       (type === 'coordenadas' &&
         origenCoords && destinoCoords &&
-        Math.abs(origenCoords[0] - (-33.435)) < 0.02 &&
-        Math.abs(origenCoords[1] - (-70.615)) < 0.02 &&
-        Math.abs(destinoCoords[0] - (-33.424)) < 0.02 &&
-        Math.abs(destinoCoords[1] - (-70.632)) < 0.02);
+        Math.abs(origenCoords[0] - (-33.435)) < 0.015 &&
+        Math.abs(origenCoords[1] - (-70.615)) < 0.015 &&
+        Math.abs(destinoCoords[0] - (-33.424)) < 0.015 &&
+        Math.abs(destinoCoords[1] - (-70.632)) < 0.015);
 
-    if (isVarasCristobal) {
+    if (isExactVarasCristobal) {
       setTimeout(() => {
         setSelectedRoute(OPTIMAL_ROUTE_VARAS_CRISTOBAL);
         setIsCalculating(false);
-      }, 350);
+      }, 300);
       return;
     }
 
-    // Si el usuario introduce coordenadas personalizadas
-    if (type === 'coordenadas' && origenCoords && destinoCoords) {
-      const lat1 = origenCoords[0], lon1 = origenCoords[1];
-      const lat2 = destinoCoords[0], lon2 = destinoCoords[1];
+    // Resolver coordenadas de origen y destino (ya sea desde direcciones geocodificadas o coordenadas directas)
+    let resolvedOrigenCoords = origenCoords;
+    let resolvedDestinoCoords = destinoCoords;
+
+    if (type === 'direcciones') {
+      const [geoOrig, geoDest] = await Promise.all([
+        geocodeAddress(origen),
+        geocodeAddress(destino)
+      ]);
+      resolvedOrigenCoords = geoOrig;
+      resolvedDestinoCoords = geoDest;
+    }
+
+    // Si contamos con coordenadas válidas para origen y destino, trazar ruta ciclista real vía OSRM + Open-Meteo Elevation
+    if (resolvedOrigenCoords && resolvedDestinoCoords) {
+      const lat1 = resolvedOrigenCoords[0], lon1 = resolvedOrigenCoords[1];
+      const lat2 = resolvedDestinoCoords[0], lon2 = resolvedDestinoCoords[1];
 
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 6000);
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
         const osrmUrl = `https://router.project-osrm.org/route/v1/bicycle/${lon1},${lat1};${lon2},${lat2}?overview=full&geometries=geojson`;
         const response = await fetch(osrmUrl, { signal: controller.signal });
         clearTimeout(timeoutId);
@@ -374,7 +516,7 @@ export default function App() {
             }
             const totalDistMeters = Math.round(routeData.distance || cumDist[cumDist.length - 1]);
 
-            const getAlt = (lat, lng, progressFraction) => {
+            const getFallbackAlt = (lat, lng, progressFraction) => {
               const isHill = lat > -33.435 && lat < -33.415 && lng > -70.645 && lng < -70.615;
               if (isHill && progressFraction > 0.39) {
                 const hProg = (progressFraction - 0.39) / 0.61;
@@ -383,11 +525,11 @@ export default function App() {
               const eastFactor = (-70.50 - lng) / (-70.50 - -70.75);
               const northFactor = (-33.35 - lat) / (-33.35 - -33.55);
               const baseElev = 520 + (1 - eastFactor) * 220 + (1 - northFactor) * 60;
-              return Math.round(baseElev + Math.sin(lat * 1200) * 8 + Math.cos(lng * 1200) * 8);
+              return Math.round(baseElev + Math.sin(lat * 1200) * 6 + Math.cos(lng * 1200) * 6);
             };
 
-            const numSamples = Math.min(30, Math.max(12, Math.floor(totalDistMeters / 150)));
-            const points = [];
+            const numSamples = Math.min(40, Math.max(16, Math.floor(totalDistMeters / 250)));
+            const sampledNodes = [];
             for (let s = 0; s <= numSamples; s++) {
               const targetDist = (s / numSamples) * totalDistMeters;
               let bestIdx = 0;
@@ -399,26 +541,60 @@ export default function App() {
                   bestIdx = i;
                 }
               }
-              const ptCoord = coords[bestIdx];
-              points.push({
+              sampledNodes.push({
                 distance: Math.round(targetDist),
-                elevation: getAlt(ptCoord[0], ptCoord[1], s / numSamples)
+                coord: coords[bestIdx],
+                frac: s / numSamples
               });
             }
 
-            const distKm = (totalDistMeters / 1000).toFixed(1);
+            // Consultar elevaciones reales a Open-Meteo Elevation API (SRTM/Copernicus DEM)
+            let elevations = null;
+            try {
+              const latsParam = sampledNodes.map(n => n.coord[0]).join(',');
+              const lonsParam = sampledNodes.map(n => n.coord[1]).join(',');
+              const elevRes = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${latsParam}&longitude=${lonsParam}`);
+              if (elevRes.ok) {
+                const elevData = await elevRes.json();
+                if (Array.isArray(elevData.elevation) && elevData.elevation.length === sampledNodes.length) {
+                  const rawElevs = elevData.elevation.map(e => Number(e));
+                  // Suavizado de media móvil ponderada en puntos intermedios para evitar dientes de sierra DEM
+                  elevations = rawElevs.map((val, idx) => {
+                    if (idx === 0 || idx === rawElevs.length - 1) return Math.round(val);
+                    return Math.round(rawElevs[idx - 1] * 0.25 + val * 0.5 + rawElevs[idx + 1] * 0.25);
+                  });
+                }
+              }
+            } catch (elevErr) {
+              console.warn('Open-Meteo Elevation fallback:', elevErr);
+            }
+
+            const points = sampledNodes.map((node, idx) => ({
+              distance: node.distance,
+              elevation: elevations ? elevations[idx] : getFallbackAlt(node.coord[0], node.coord[1], node.frac)
+            }));
+
+            const shortLabel = (str, fallbackCoord) => {
+              if (!str || !str.trim()) return `(${fallbackCoord[0].toFixed(3)}, ${fallbackCoord[1].toFixed(3)})`;
+              return str.split(',')[0].trim();
+            };
+
+            const shortOrigen = shortLabel(origen, resolvedOrigenCoords);
+            const shortDestino = shortLabel(destino, resolvedDestinoCoords);
+            const distKm = (totalDistMeters / 1000).toFixed(2);
+
             const dynamicRoute = {
               id: `osrm-calculated-route-${Date.now()}`,
-              name: `Ruta Ciclista Calculada (${distKm} km)`,
-              subtitle: `Trazado ciclista real en calles (${coords.length} coordenadas viales)`,
+              name: `Ruta Óptima: ${shortOrigen} ➔ ${shortDestino} (${distKm} km)`,
+              subtitle: `Trazado ciclista real OSRM (${coords.length} nodos viales) • Altimetría Open-Meteo`,
               category: 'Ruta Óptima',
               surface: 'Ciclovía segregada / Vía urbana compartida',
-              difficulty: totalDistMeters > 10000 ? 'Exigente' : (totalDistMeters > 5000 ? 'Moderada' : 'Fácil'),
+              difficulty: totalDistMeters > 12000 ? 'Exigente' : (totalDistMeters > 5000 ? 'Moderada' : 'Fácil'),
               badgeColor: 'emerald',
               center: [(lat1 + lat2) / 2, (lon1 + lon2) / 2],
-              zoom: 14,
-              origen: origen || `Lat: ${lat1.toFixed(3)}, Lng: ${lon1.toFixed(3)}`,
-              destino: destino || `Lat: ${lat2.toFixed(3)}, Lng: ${lon2.toFixed(3)}`,
+              zoom: totalDistMeters > 15000 ? 12 : (totalDistMeters > 7000 ? 13 : 14),
+              origen: origen || `Lat: ${lat1.toFixed(4)}, Lng: ${lon1.toFixed(4)}`,
+              destino: destino || `Lat: ${lat2.toFixed(4)}, Lng: ${lon2.toFixed(4)}`,
               coordinates: coords,
               points: points
             };
@@ -429,11 +605,11 @@ export default function App() {
           }
         }
       } catch (osrmErr) {
-        console.warn('Error en cálculo OSRM dinámico, recurriendo a preset real:', osrmErr);
+        console.warn('Error en cálculo OSRM dinámico:', osrmErr);
       }
     }
 
-    // Fallback: usar una de las rutas predeterminadas reales de PRESET_ROUTES (que ya tienen entre 91 y 417 puntos sobre calles)
+    // Fallback en caso de sin conexión externa
     setTimeout(() => {
       const match = PRESET_ROUTES[0];
       setSelectedRoute({
