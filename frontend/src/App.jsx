@@ -465,14 +465,14 @@ export default function App() {
       return;
     }
 
-    // Resolver coordenadas de origen y destino (ya sea desde direcciones geocodificadas o coordenadas directas)
+    // Resolver coordenadas de origen y destino (ya sea desde autocompletado, direcciones geocodificadas o coordenadas directas)
     let resolvedOrigenCoords = origenCoords;
     let resolvedDestinoCoords = destinoCoords;
 
     if (type === 'direcciones') {
       const [geoOrig, geoDest] = await Promise.all([
-        geocodeAddress(origen),
-        geocodeAddress(destino)
+        resolvedOrigenCoords ? Promise.resolve(resolvedOrigenCoords) : geocodeAddress(origen),
+        resolvedDestinoCoords ? Promise.resolve(resolvedDestinoCoords) : geocodeAddress(destino)
       ]);
       resolvedOrigenCoords = geoOrig;
       resolvedDestinoCoords = geoDest;
