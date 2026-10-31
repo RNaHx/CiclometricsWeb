@@ -601,7 +601,7 @@ export default function InteractiveMap({
 
             {isLayerMenuOpen && (
               <div 
-                className="absolute right-0 top-full mt-1.5 bg-white/95 dark:bg-slate-950/95 backdrop-blur-md border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl p-1.5 min-w-[220px] flex flex-col gap-1 z-30"
+                className="absolute left-0 top-full mt-1.5 bg-white/95 dark:bg-slate-950/95 backdrop-blur-md border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl p-1.5 w-60 sm:w-64 max-w-[calc(100vw-2rem)] min-w-[235px] flex flex-col gap-1 z-30"
               >
                 <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-slate-800/80">
                   Capas Cartográficas
