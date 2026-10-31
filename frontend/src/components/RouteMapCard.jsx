@@ -1,5 +1,5 @@
-import React from 'react';
-import { Compass } from 'lucide-react';
+import React, { useState } from 'react';
+import { Compass, Eye, EyeOff } from 'lucide-react';
 import InteractiveMap from './InteractiveMap';
 import ErrorBoundary from './ErrorBoundary';
 
@@ -10,19 +10,47 @@ export default function RouteMapCard({
   hoverCoordinate,
   theme
 }) {
+  const [isCleanView, setIsCleanView] = useState(false);
+
   return (
     <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-lg transition-colors flex flex-col">
       
-      {/* Header con título y badge "MAPA INTERACTIVO ACTIVO" */}
-      <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 dark:border-slate-800">
+      {/* Header con título, botón Despejar Vista y badge "MAPA INTERACTIVO ACTIVO" */}
+      <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-3.5 border-b border-slate-100 dark:border-slate-800">
         <div className="flex items-center gap-2">
           <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
           <h3 className="font-bold text-sm text-slate-900 dark:text-white">
             Trazado Geoespacial de la Ruta
           </h3>
         </div>
-        <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-[10px] uppercase tracking-wider border border-emerald-500/30">
-          <span>MAPA INTERACTIVO ACTIVO</span>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsCleanView(prev => !prev)}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all border ${
+              isCleanView
+                ? 'bg-emerald-500 text-white border-emerald-400 shadow-sm shadow-emerald-500/20'
+                : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-500/30'
+            }`}
+            title={isCleanView ? 'Restaurar controles superpuestos del mapa' : 'Ocultar superposiciones para ver solo el mapa y la ruta'}
+          >
+            {isCleanView ? (
+              <>
+                <Eye className="w-3.5 h-3.5" />
+                <span>Mostrar Controles</span>
+              </>
+            ) : (
+              <>
+                <EyeOff className="w-3.5 h-3.5" />
+                <span>Despejar Vista</span>
+              </>
+            )}
+          </button>
+
+          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-[10px] uppercase tracking-wider border border-emerald-500/30">
+            <span>MAPA INTERACTIVO ACTIVO</span>
+          </div>
         </div>
       </div>
 
@@ -36,6 +64,8 @@ export default function RouteMapCard({
             onSetCustomRoute={onSetCustomRoute}
             hoverCoordinate={hoverCoordinate}
             theme={theme}
+            isCleanView={isCleanView}
+            onToggleCleanView={() => setIsCleanView(prev => !prev)}
           />
         </ErrorBoundary>
 

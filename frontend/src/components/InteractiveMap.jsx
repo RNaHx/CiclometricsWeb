@@ -11,7 +11,9 @@ import {
   RotateCcw,
   Sparkles,
   Loader2,
-  ChevronDown
+  ChevronDown,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { PRESET_ROUTES } from '../data/presetRoutes';
 
@@ -61,7 +63,9 @@ export default function InteractiveMap({
   customRoutePoints,
   onSetCustomRoute,
   hoverCoordinate,
-  theme
+  theme,
+  isCleanView = false,
+  onToggleCleanView
 }) {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -545,131 +549,157 @@ export default function InteractiveMap({
   return (
     <div className="relative rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-900 shadow-xl flex flex-col h-[520px]">
       
+      {/* Botón flotante minimalista para restaurar controles cuando la vista está despejada */}
+      {isCleanView && (
+        <button
+          type="button"
+          onClick={() => onToggleCleanView?.()}
+          title="Mostrar controles del mapa"
+          aria-label="Mostrar controles del mapa"
+          className="absolute top-3 right-3 z-20 w-8 h-8 rounded-xl flex items-center justify-center bg-white/85 dark:bg-slate-950/85 backdrop-blur-md border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 shadow-lg opacity-60 hover:opacity-100 hover:text-emerald-500 dark:hover:text-emerald-400 transition-all"
+        >
+          <Eye className="w-4 h-4" />
+        </button>
+      )}
+
       {/* Barra Superior Flotante: Selector de Rutas Emblemáticas y Capas */}
-      <div className="absolute top-3 left-3 right-3 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
-        
-        {/* Chips de Rutas Predeterminadas */}
-        <div className="flex flex-wrap items-center gap-1.5 pointer-events-auto bg-white/90 dark:bg-slate-950/90 backdrop-blur-md p-1.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-lg max-w-full overflow-x-auto">
-          {PRESET_ROUTES.map((route) => {
-            const isSelected = selectedRoute?.id === route.id;
-            return (
-              <button
-                key={route.id}
-                onClick={() => {
-                  setIsCustomMode(false);
-                  setCustomMarkers([]);
-                  onSelectRoute(route);
-                }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center gap-1.5 ${
-                  isSelected
-                    ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/25 ring-1 ring-emerald-400'
-                    : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-                }`}
-              >
-                <span>{route.name.split('/')[0]}</span>
-                <span className={`text-[10px] px-1.5 py-0.2 rounded font-normal ${
-                  route.difficulty === 'Exigente' || route.difficulty === 'Muy Difícil'
-                    ? 'bg-rose-500/20 text-rose-300'
-                    : 'bg-emerald-500/20 text-emerald-300'
-                }`}>
-                  {route.difficulty}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Controles de Capas y Modo Personalizado */}
-        <div className="pointer-events-auto flex items-center gap-2">
+      {!isCleanView && (
+        <div className="absolute top-3 left-3 right-3 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
           
-          {/* Selector Flotante de Capas (CyclOSM, OSM, Satélite) */}
-          <div className="relative" ref={layerMenuRef}>
-            <button
-              type="button"
-              onClick={() => setIsLayerMenuOpen(prev => !prev)}
-              className="px-3 py-1.5 rounded-xl text-xs font-semibold backdrop-blur-md border transition-all flex items-center gap-1.5 shadow-lg bg-white/90 dark:bg-slate-950/90 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800"
-              title="Cambiar capa cartográfica del mapa"
-              aria-expanded={isLayerMenuOpen}
-            >
-              <Layers className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
-              <span className="flex items-center gap-1">
-                <span>{MAP_LAYERS[activeLayer]?.icon}</span>
-                <span className="hidden sm:inline font-medium">{MAP_LAYERS[activeLayer]?.name}</span>
-              </span>
-              <ChevronDown className="w-3 h-3 text-slate-400" />
-            </button>
-
-            {isLayerMenuOpen && (
-              <div 
-                className="absolute left-0 top-full mt-1.5 bg-white/95 dark:bg-slate-950/95 backdrop-blur-md border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl p-1.5 w-60 sm:w-64 max-w-[calc(100vw-2rem)] min-w-[235px] flex flex-col gap-1 z-30"
-              >
-                <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-slate-800/80">
-                  Capas Cartográficas
-                </div>
-                {Object.values(MAP_LAYERS).map((layer) => {
-                  const isCurrent = activeLayer === layer.id;
-                  return (
-                    <button
-                      key={layer.id}
-                      type="button"
-                      onClick={() => {
-                        setActiveLayer(layer.id);
-                        setIsLayerMenuOpen(false);
-                      }}
-                      className={`w-full px-2.5 py-2 rounded-lg text-left text-xs font-medium transition-all flex items-center justify-between gap-2 ${
-                        isCurrent
-                          ? 'bg-emerald-500 text-white font-semibold shadow-sm'
-                          : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/80'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="text-base">{layer.icon}</span>
-                        <div>
-                          <div className="font-semibold text-xs leading-none">{layer.name}</div>
-                          <div className={`text-[10px] mt-0.5 ${isCurrent ? 'text-emerald-100' : 'text-slate-400'}`}>
-                            {layer.description}
-                          </div>
-                        </div>
-                      </div>
-                      {isCurrent && <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" />}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+          {/* Chips de Rutas Predeterminadas */}
+          <div className="flex flex-wrap items-center gap-1.5 pointer-events-auto bg-white/90 dark:bg-slate-950/90 backdrop-blur-md p-1.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-lg max-w-full overflow-x-auto">
+            {PRESET_ROUTES.map((route) => {
+              const isSelected = selectedRoute?.id === route.id;
+              return (
+                <button
+                  key={route.id}
+                  onClick={() => {
+                    setIsCustomMode(false);
+                    setCustomMarkers([]);
+                    onSelectRoute(route);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                    isSelected
+                      ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/25 ring-1 ring-emerald-400'
+                      : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <span>{route.name.split('/')[0]}</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded font-normal ${
+                    route.difficulty === 'Exigente' || route.difficulty === 'Muy Difícil'
+                      ? 'bg-rose-500/20 text-rose-300'
+                      : 'bg-emerald-500/20 text-emerald-300'
+                  }`}>
+                    {route.difficulty}
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
-          {/* Botón Modo Personalizado (Marcar en mapa) */}
-          <button
-            onClick={() => {
-              setIsCustomMode(!isCustomMode);
-              setCustomMarkers([]);
-            }}
-            disabled={isRouting}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold backdrop-blur-md border transition-all flex items-center gap-1.5 shadow-lg ${
-              isCustomMode
-                ? 'bg-purple-600 text-white border-purple-400 ring-2 ring-purple-400/40 animate-pulse'
-                : 'bg-white/90 dark:bg-slate-950/90 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            {isRouting ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-200" />
-            ) : (
-              <MousePointer className="w-3.5 h-3.5" />
-            )}
-            <span>
-              {isRouting 
-                ? 'Ruteando con OSRM...' 
-                : isCustomMode 
-                  ? 'Haz clic en el mapa (Origen y Meta)' 
-                  : 'Crear Ruta Propia'}
-            </span>
-          </button>
+          {/* Controles de Capas, Modo Personalizado y Despejar Vista */}
+          <div className="pointer-events-auto flex items-center gap-2">
+            
+            {/* Selector Flotante de Capas (CyclOSM, OSM, Satélite) */}
+            <div className="relative" ref={layerMenuRef}>
+              <button
+                type="button"
+                onClick={() => setIsLayerMenuOpen(prev => !prev)}
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold backdrop-blur-md border transition-all flex items-center gap-1.5 shadow-lg bg-white/90 dark:bg-slate-950/90 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800"
+                title="Cambiar capa cartográfica del mapa"
+                aria-expanded={isLayerMenuOpen}
+              >
+                <Layers className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+                <span className="flex items-center gap-1">
+                  <span>{MAP_LAYERS[activeLayer]?.icon}</span>
+                  <span className="hidden sm:inline font-medium">{MAP_LAYERS[activeLayer]?.name}</span>
+                </span>
+                <ChevronDown className="w-3 h-3 text-slate-400" />
+              </button>
+
+              {isLayerMenuOpen && (
+                <div 
+                  className="absolute left-0 top-full mt-1.5 bg-white/95 dark:bg-slate-950/95 backdrop-blur-md border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl p-1.5 w-60 sm:w-64 max-w-[calc(100vw-2rem)] min-w-[235px] flex flex-col gap-1 z-30"
+                >
+                  <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-slate-800/80">
+                    Capas Cartográficas
+                  </div>
+                  {Object.values(MAP_LAYERS).map((layer) => {
+                    const isCurrent = activeLayer === layer.id;
+                    return (
+                      <button
+                        key={layer.id}
+                        type="button"
+                        onClick={() => {
+                          setActiveLayer(layer.id);
+                          setIsLayerMenuOpen(false);
+                        }}
+                        className={`w-full px-2.5 py-2 rounded-lg text-left text-xs font-medium transition-all flex items-center justify-between gap-2 ${
+                          isCurrent
+                            ? 'bg-emerald-500 text-white font-semibold shadow-sm'
+                            : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/80'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">{layer.icon}</span>
+                          <div>
+                            <div className="font-semibold text-xs leading-none">{layer.name}</div>
+                            <div className={`text-[10px] mt-0.5 ${isCurrent ? 'text-emerald-100' : 'text-slate-400'}`}>
+                              {layer.description}
+                            </div>
+                          </div>
+                        </div>
+                        {isCurrent && <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Botón Modo Personalizado (Marcar en mapa) */}
+            <button
+              onClick={() => {
+                setIsCustomMode(!isCustomMode);
+                setCustomMarkers([]);
+              }}
+              disabled={isRouting}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold backdrop-blur-md border transition-all flex items-center gap-1.5 shadow-lg ${
+                isCustomMode
+                  ? 'bg-purple-600 text-white border-purple-400 ring-2 ring-purple-400/40 animate-pulse'
+                  : 'bg-white/90 dark:bg-slate-950/90 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              {isRouting ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-purple-200" />
+              ) : (
+                <MousePointer className="w-3.5 h-3.5" />
+              )}
+              <span>
+                {isRouting 
+                  ? 'Ruteando con OSRM...' 
+                  : isCustomMode 
+                    ? 'Haz clic en el mapa (Origen y Meta)' 
+                    : 'Crear Ruta Propia'}
+              </span>
+            </button>
+
+            {/* Botón compacto Despejar Vista */}
+            <button
+              type="button"
+              onClick={() => onToggleCleanView?.()}
+              title="Despejar vista del mapa"
+              aria-label="Despejar vista del mapa"
+              className="p-1.5 rounded-xl text-xs font-semibold backdrop-blur-md border transition-all flex items-center justify-center shadow-lg bg-white/90 dark:bg-slate-950/90 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-emerald-500 dark:hover:text-emerald-400"
+            >
+              <EyeOff className="w-4 h-4" />
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Cartel Flotante de Estado de Ruteo o Instrucción de Clic */}
-      {routingNotice && (
+      {!isCleanView && routingNotice && (
         <div className="absolute top-16 left-1/2 -translate-x-1/2 z-20 pointer-events-auto bg-slate-900/95 text-white backdrop-blur-md px-4 py-1.5 rounded-full border border-emerald-500/40 shadow-xl text-xs flex items-center gap-2">
           {isRouting ? (
             <Loader2 className="w-3.5 h-3.5 text-emerald-400 animate-spin" />
@@ -680,7 +710,7 @@ export default function InteractiveMap({
         </div>
       )}
 
-      {isCustomMode && customMarkers.length === 1 && !routingNotice && (
+      {!isCleanView && isCustomMode && customMarkers.length === 1 && !routingNotice && (
         <div className="absolute top-16 left-1/2 -translate-x-1/2 z-20 pointer-events-auto bg-slate-900/90 text-white backdrop-blur-md px-4 py-1.5 rounded-full border border-purple-500/40 shadow-xl text-xs flex items-center gap-2">
           <Flag className="w-3.5 h-3.5 text-purple-400" />
           <span>Punto A fijado. Haz clic en el mapa para marcar el Punto B (Destino).</span>
@@ -694,7 +724,7 @@ export default function InteractiveMap({
       />
 
       {/* Banner Informativo Inferior Flotante de la Ruta Activa */}
-      {selectedRoute && (
+      {!isCleanView && selectedRoute && (
         <div className="absolute bottom-3 left-3 z-20 pointer-events-auto bg-white/90 dark:bg-slate-950/90 backdrop-blur-md px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-lg text-xs max-w-sm sm:max-w-md hidden sm:block">
           <div className="flex items-center gap-2">
             <Navigation className="w-4 h-4 text-emerald-500 flex-shrink-0" />
