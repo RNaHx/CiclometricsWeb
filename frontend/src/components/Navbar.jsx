@@ -28,7 +28,7 @@ export default function Navbar({
 
   const userNameUpper = (profile?.user?.nombre || 'CICLISTA').toUpperCase();
   const userWeight = profile?.user?.biometria?.peso || 75;
-  const userBikeType = profile?.bicycle?.nombre || 'Bici Aro 29';
+  const userBikeType = profile?.bicycle?.nombre || 'Sin bicicleta';
 
   return (
     <header className="sticky top-0 z-40 backdrop-blur-md border-b transition-colors duration-200 bg-white/90 dark:bg-slate-950/90 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-100">

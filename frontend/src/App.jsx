@@ -105,25 +105,31 @@ export default function App() {
   }, [checkBackendConnectivity]);
 
   // 4. BICICLETAS DEL USUARIO
-  const [bicycles, setBicycles] = useState([DEFAULT_BIKE]);
-  const [selectedBikeId, setSelectedBikeId] = useState(DEFAULT_BIKE.id);
+  const [bicycles, setBicycles] = useState([]);
+  const [selectedBikeId, setSelectedBikeId] = useState(null);
   const [isAddBikeModalOpen, setIsAddBikeModalOpen] = useState(false);
 
   const fetchBicycles = useCallback(async (userId) => {
     try {
+      if (!userId) {
+        setBicycles([]);
+        setSelectedBikeId(null);
+        return;
+      }
       const res = await apiService.getBicycles(userId);
-      if (res && res.data && res.data.length > 0) {
+      if (res && Array.isArray(res.data) && res.data.length > 0) {
         setBicycles(res.data);
         if (!selectedBikeId || !res.data.some(b => b.id === selectedBikeId)) {
           setSelectedBikeId(res.data[0].id);
         }
       } else {
-        setBicycles([DEFAULT_BIKE]);
-        setSelectedBikeId(DEFAULT_BIKE.id);
+        setBicycles([]);
+        setSelectedBikeId(null);
       }
     } catch (err) {
-      console.warn('Error cargando bicicletas, usando predeterminadas:', err);
-      setBicycles([DEFAULT_BIKE]);
+      console.warn('Error cargando bicicletas:', err);
+      setBicycles([]);
+      setSelectedBikeId(null);
     }
   }, [selectedBikeId]);
 
@@ -156,7 +162,7 @@ export default function App() {
   };
 
   const activeBike = useMemo(() => {
-    return bicycles.find(b => b.id === selectedBikeId) || bicycles[0] || DEFAULT_BIKE;
+    return bicycles.find(b => b.id === selectedBikeId) || bicycles[0] || null;
   }, [bicycles, selectedBikeId]);
 
   // 5. PERFIL DEPORTIVO Y BIOMÉTRICO ACTIVO
@@ -680,6 +686,8 @@ export default function App() {
     setCookieConsent(null);
     setSelectedRoute(null);
     setCalculationData(null);
+    setBicycles([]);
+    setSelectedBikeId(null);
   };
 
   return (
@@ -768,6 +776,7 @@ export default function App() {
               onSelectBikeId={setSelectedBikeId}
               onCalculateRoute={handleCalculateRoutePlan}
               isCalculating={isCalculating}
+              onOpenAddBikeModal={() => setIsAddBikeModalOpen(true)}
             />
 
             {/* Tarjeta 2: Mis Bicicletas */}

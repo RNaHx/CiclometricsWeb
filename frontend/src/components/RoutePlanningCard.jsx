@@ -98,7 +98,8 @@ export default function RoutePlanningCard({
   selectedBikeId,
   onSelectBikeId,
   onCalculateRoute,
-  isCalculating
+  isCalculating,
+  onOpenAddBikeModal
 }) {
   const [activeTab, setActiveTab] = useState('direcciones'); // 'direcciones' | 'coordenadas'
   
@@ -656,18 +657,35 @@ export default function RoutePlanningCard({
 
         {/* Dropdown BICICLETA cargado dinámicamente con las bicis del usuario */}
         <div>
-          <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
-            Bicicleta
-          </label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Bicicleta
+            </label>
+            {bicycles.length === 0 && onOpenAddBikeModal && (
+              <button
+                type="button"
+                onClick={onOpenAddBikeModal}
+                className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 hover:underline transition-colors"
+              >
+                + Registrar bicicleta
+              </button>
+            )}
+          </div>
           <div className="relative">
-            <Bike className="w-3.5 h-3.5 text-emerald-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Bike className="w-3.5 h-3.5 text-emerald-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <select
-              value={selectedBikeId || ''}
-              onChange={(e) => onSelectBikeId(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-800 dark:text-slate-100 font-medium focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
+              value={bicycles.length === 0 ? '__add_new__' : (selectedBikeId || '')}
+              onChange={(e) => {
+                if (e.target.value === '__add_new__') {
+                  if (onOpenAddBikeModal) onOpenAddBikeModal();
+                } else {
+                  onSelectBikeId(e.target.value);
+                }
+              }}
+              className="w-full bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-800 dark:text-slate-100 font-medium focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all cursor-pointer"
             >
               {bicycles.length === 0 ? (
-                <option value="">Aro 29 • 60mm (10kg)</option>
+                <option value="__add_new__">⚠️ Sin bicicleta registrada (Clic para registrar)</option>
               ) : (
                 bicycles.map((bike) => (
                   <option key={bike.id} value={bike.id}>

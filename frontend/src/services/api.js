@@ -93,19 +93,7 @@ const FALLBACK_DEFAULT_USER = {
   }
 };
 
-const FALLBACK_DEFAULT_BIKES = [
-  {
-    id: 'default-bike-1',
-    nombre: 'Bici Aro 29',
-    tipo: 'mtb',
-    peso: 10,
-    rodado: '29',
-    ancho_neumatico: 60,
-    psi_min: 30,
-    psi_max: 70,
-    userId: 'default-cyclist'
-  }
-];
+const FALLBACK_DEFAULT_BIKES = [];
 
 /**
  * Petición genérica con manejo de timeouts, tokens y errores legibles
@@ -294,6 +282,7 @@ export const apiService = {
     deleteCookie(SESSION_KEY_USER);
     localStorage.removeItem(SESSION_KEY_TOKEN);
     localStorage.removeItem(SESSION_KEY_USER);
+    localStorage.removeItem(STORAGE_KEY_BIKES);
     sessionStorage.removeItem(SESSION_KEY_TOKEN);
     sessionStorage.removeItem(SESSION_KEY_USER);
   },
@@ -525,7 +514,7 @@ export const apiService = {
       const targetUser = userId || this.getSession()?.user?.id;
       const query = targetUser ? `?userId=${encodeURIComponent(targetUser)}` : '';
       const response = await request(`/bicycles${query}`);
-      if (response && response.data) {
+      if (response && Array.isArray(response.data)) {
         localStorage.setItem(STORAGE_KEY_BIKES, JSON.stringify(response.data));
         return response;
       }
@@ -536,13 +525,15 @@ export const apiService = {
       if (local) {
         try {
           const parsed = JSON.parse(local);
-          return { success: true, count: parsed.length, data: parsed };
+          if (Array.isArray(parsed)) {
+            const userBikes = userId ? parsed.filter(b => !b.userId || b.userId === userId) : parsed;
+            return { success: true, count: userBikes.length, data: userBikes };
+          }
         } catch (e) {
           // continuar a fallback
         }
       }
-      localStorage.setItem(STORAGE_KEY_BIKES, JSON.stringify(FALLBACK_DEFAULT_BIKES));
-      return { success: true, count: FALLBACK_DEFAULT_BIKES.length, data: FALLBACK_DEFAULT_BIKES };
+      return { success: true, count: 0, data: [] };
     }
   },
 
