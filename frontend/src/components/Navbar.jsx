@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { APP_VERSION_LABEL } from '../config/version';
 import { 
   Bike, 
   Sun, 
@@ -45,7 +46,7 @@ export default function Navbar({
                 CicloMetrics
               </span>
               <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-                WEB V1.0
+                {APP_VERSION_LABEL}
               </span>
             </div>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block leading-tight">

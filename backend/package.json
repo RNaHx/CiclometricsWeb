@@ -1,6 +1,6 @@
 {
   "name": "ciclometrics-backend",
-  "version": "1.0.0",
+  "version": "1.6.2",
   "description": "Backend API y motor de cálculo físico-mecánico para CicloMetrics Web",
   "main": "src/server.js",
   "type": "commonjs",

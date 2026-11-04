@@ -1,4 +1,5 @@
 import React from 'react';
+import { APP_VERSION_LABEL } from '../config/version';
 import { 
   X, 
   Bike, 
@@ -38,7 +39,7 @@ export default function CockpitView({
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-emerald-400 animate-ping"></div>
           <span className="text-xs font-bold tracking-widest uppercase text-emerald-400">
-            COCKPIT MANILLAR V1.0
+            COCKPIT MANILLAR {APP_VERSION_LABEL}
           </span>
         </div>
 
