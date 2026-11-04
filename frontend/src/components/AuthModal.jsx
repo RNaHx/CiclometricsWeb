@@ -677,9 +677,10 @@ export default function AuthModal({ onAuthSuccess }) {
                   <input
                     id="reg-peso"
                     type="number"
-                    min="35"
-                    max="200"
-                    step="0.5"
+                    min="30"
+                    max="250"
+                    step="0.01"
+                    placeholder="Ej. 62.02"
                     value={regPeso}
                     onChange={(e) => setRegPeso(e.target.value)}
                     className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"

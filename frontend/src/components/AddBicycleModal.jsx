@@ -160,7 +160,7 @@ export default function AddBicycleModal({ isOpen, onClose, onAddBicycle, userId 
               </label>
               <input
                 type="number"
-                step="0.1"
+                step="0.01"
                 min="4"
                 max="40"
                 value={peso}

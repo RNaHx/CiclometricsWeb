@@ -116,7 +116,7 @@ function validateUser(data, options = {}) {
     nombre: data.nombre.trim(),
     email: data.email.trim().toLowerCase(),
     biometria: {
-      peso: Math.round(peso * 10) / 10,
+      peso: Math.round(peso * 100) / 100,
       altura: Math.round(altura),
       edad,
       genero,
@@ -187,7 +187,7 @@ function validateBicycle(data) {
 
   const sanitized = errors.length === 0 ? {
     tipo,
-    peso: Math.round(peso * 10) / 10,
+    peso: Math.round(peso * 100) / 100,
     rodado,
     ancho_neumatico: Math.round(ancho),
     psi_min: Math.round(psi_min),

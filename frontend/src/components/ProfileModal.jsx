@@ -123,9 +123,9 @@ export default function ProfileModal({
   // Cálculos reactivos informativos
   const pesoUsuario = formData.user.biometria.peso || 0;
   const pesoBici = formData.bicycle.peso || 0;
-  const masaTotal = (pesoUsuario + pesoBici).toFixed(1);
-  const cargaDelantera = (masaTotal * 0.4).toFixed(1);
-  const cargaTrasera = (masaTotal * 0.6).toFixed(1);
+  const masaTotal = (pesoUsuario + pesoBici).toFixed(2);
+  const cargaDelantera = (masaTotal * 0.4).toFixed(2);
+  const cargaTrasera = (masaTotal * 0.6).toFixed(2);
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
@@ -216,9 +216,10 @@ export default function ProfileModal({
                 <div className="relative">
                   <input
                     type="number"
-                    min="35"
-                    max="180"
-                    step="0.5"
+                    min="30"
+                    max="250"
+                    step="0.01"
+                    placeholder="Ej. 62.02"
                     value={formData.user.biometria.peso}
                     onChange={(e) => handleBiometriaChange('peso', e.target.value)}
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-sm font-semibold focus:ring-2 focus:ring-emerald-500 focus:outline-none pl-9"
@@ -328,9 +329,10 @@ export default function ProfileModal({
                 <div className="relative">
                   <input
                     type="number"
-                    min="5"
-                    max="35"
-                    step="0.1"
+                    min="4"
+                    max="40"
+                    step="0.01"
+                    placeholder="Ej. 8.50"
                     value={formData.bicycle.peso}
                     onChange={(e) => handleBicycleChange('peso', e.target.value)}
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-sm font-semibold focus:ring-2 focus:ring-emerald-500 focus:outline-none pl-9"
