@@ -60,14 +60,30 @@ function getStoredSessionRaw() {
       user = null;
     }
   }
+
+  // Si hay una sesión residual de la cuenta de prueba eliminada, limpiarla automáticamente
+  if (
+    user &&
+    (user.id === 'user-ricardo-1' ||
+      String(user.email || '').trim().toLowerCase() === 'ricardo@ciclometrics.cl')
+  ) {
+    deleteCookie(SESSION_KEY_TOKEN);
+    deleteCookie(SESSION_KEY_USER);
+    localStorage.removeItem(SESSION_KEY_TOKEN);
+    localStorage.removeItem(SESSION_KEY_USER);
+    sessionStorage.removeItem(SESSION_KEY_TOKEN);
+    sessionStorage.removeItem(SESSION_KEY_USER);
+    return { token: null, user: null };
+  }
+
   return { token, user };
 }
 
-// Perfil de respaldo para modo offline
+// Perfil de respaldo neutro para modo offline
 const FALLBACK_DEFAULT_USER = {
-  id: 'user-ricardo-1',
-  nombre: 'Ricardo Henríquez',
-  email: 'ricardo@ciclometrics.cl',
+  id: 'default-cyclist',
+  nombre: 'Ciclista',
+  email: '',
   biometria: {
     peso: 75,
     altura: 178,
@@ -79,7 +95,7 @@ const FALLBACK_DEFAULT_USER = {
 
 const FALLBACK_DEFAULT_BIKES = [
   {
-    id: 'bike-ricardo-1',
+    id: 'default-bike-1',
     nombre: 'Bici Aro 29',
     tipo: 'mtb',
     peso: 10,
@@ -87,7 +103,7 @@ const FALLBACK_DEFAULT_BIKES = [
     ancho_neumatico: 60,
     psi_min: 30,
     psi_max: 70,
-    userId: 'user-ricardo-1'
+    userId: 'default-cyclist'
   }
 ];
 
@@ -295,7 +311,12 @@ export const apiService = {
   _getAccountsRegistry() {
     try {
       const raw = localStorage.getItem('ciclometrics_accounts_registry');
-      return raw ? JSON.parse(raw) : {};
+      const parsed = raw ? JSON.parse(raw) : {};
+      if (parsed['ricardo@ciclometrics.cl']) {
+        delete parsed['ricardo@ciclometrics.cl'];
+        localStorage.setItem('ciclometrics_accounts_registry', JSON.stringify(parsed));
+      }
+      return parsed;
     } catch {
       return {};
     }

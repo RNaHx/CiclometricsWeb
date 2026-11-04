@@ -5,40 +5,8 @@ const config = require('../config/config');
 const { MongoStore } = require('./mongoStore');
 
 const DEFAULT_SEED_DATA = {
-  users: [
-    {
-      id: 'user-ricardo-1',
-      nombre: 'Ricardo Henríquez',
-      email: 'ricardo@ciclometrics.cl',
-      password: 'password123',
-      acceptedTerms: true,
-      termsAcceptedAt: '2026-09-30T00:00:00.000Z',
-      biometria: {
-        peso: 75,
-        altura: 178,
-        edad: 30,
-        genero: 'masculino',
-        nivel: 'intermedio'
-      },
-      createdAt: '2026-09-30T00:00:00.000Z',
-      updatedAt: '2026-09-30T00:00:00.000Z'
-    }
-  ],
-  bicycles: [
-    {
-      id: 'bike-ricardo-1',
-      userId: 'user-ricardo-1',
-      nombre: 'Bici Aro 29',
-      tipo: 'mtb',
-      peso: 10,
-      rodado: '29',
-      ancho_neumatico: 60,
-      psi_min: 30,
-      psi_max: 70,
-      createdAt: '2026-09-30T00:00:00.000Z',
-      updatedAt: '2026-09-30T00:00:00.000Z'
-    }
-  ],
+  users: [],
+  bicycles: [],
   routes: []
 };
 
@@ -76,17 +44,22 @@ class JsonStore {
           needsSave = true;
         }
 
-        const hasRicardo = currentData.users.some(
-          (u) => u.id === 'user-ricardo-1' || u.email === 'ricardo@ciclometrics.cl'
+        // Eliminar cuenta de prueba/demo legada si existiera en la persistencia local
+        const prevUsersLen = currentData.users.length;
+        currentData.users = currentData.users.filter(
+          (u) =>
+            u.id !== 'user-ricardo-1' &&
+            String(u.email || '').trim().toLowerCase() !== 'ricardo@ciclometrics.cl'
         );
-        if (!hasRicardo) {
-          currentData.users.unshift(DEFAULT_SEED_DATA.users[0]);
+        if (currentData.users.length !== prevUsersLen) {
           needsSave = true;
         }
 
-        const hasBike = currentData.bicycles.some((b) => b.id === 'bike-ricardo-1');
-        if (!hasBike) {
-          currentData.bicycles.unshift(DEFAULT_SEED_DATA.bicycles[0]);
+        const prevBikesLen = currentData.bicycles.length;
+        currentData.bicycles = currentData.bicycles.filter(
+          (b) => b.id !== 'bike-ricardo-1' && b.userId !== 'user-ricardo-1'
+        );
+        if (currentData.bicycles.length !== prevBikesLen) {
           needsSave = true;
         }
 

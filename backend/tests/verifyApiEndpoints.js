@@ -18,6 +18,10 @@ async function runApiIntegrationTests() {
 
   console.log(`\nIniciando pruebas de integración API en ${baseUrl}...\n`);
 
+  const cleanupUsers = [];
+  const cleanupBikes = [];
+  const cleanupRoutes = [];
+
   try {
     // 1. GET /api/health y validación del entrypoint Serverless de Vercel
     const vercelHandler = require('../../api/index.js');
@@ -33,7 +37,7 @@ async function runApiIntegrationTests() {
     const profilePayload = {
       user: {
         nombre: 'Carlos Ciclista',
-        email: 'carlos@ciclometrics.com',
+        email: `carlos_${Date.now()}@ciclometrics.com`,
         biometria: {
           peso: 76.5,
           altura: 179,
@@ -65,12 +69,14 @@ async function runApiIntegrationTests() {
     console.log('  [PASS] POST /api/profile crea usuario y bicicleta');
 
     const createdUserId = postProfileData.data.user.id;
+    cleanupUsers.push(createdUserId);
+    cleanupBikes.push(postProfileData.data.bicycle.id);
 
     // 3. GET /api/profile/:id
     const getProfileRes = await fetch(`${baseUrl}/profile/${createdUserId}`);
     const getProfileData = await getProfileRes.json();
     assert.strictEqual(getProfileRes.status, 200);
-    assert.strictEqual(getProfileData.data.user.email, 'carlos@ciclometrics.com');
+    assert.strictEqual(getProfileData.data.user.email, profilePayload.user.email);
     assert.strictEqual(getProfileData.data.bicycle.tipo, 'gravel');
     console.log('  [PASS] GET /api/profile/:id recupera el perfil correctamente');
 
@@ -97,6 +103,7 @@ async function runApiIntegrationTests() {
     const calcData = await calcRes.json();
     assert.strictEqual(calcRes.status, 200);
     assert.strictEqual(calcData.success, true);
+    if (calcData.data?.id) cleanupRoutes.push(calcData.data.id);
     assert.strictEqual(calcData.data.distancia_km, 10);
     assert(calcData.data.tiempo_estimado_min > 0, 'ETA debe ser calculado');
     assert(calcData.data.kcal_quemadas > 0, 'kCal debe ser calculada');
@@ -181,10 +188,12 @@ async function runApiIntegrationTests() {
     assert(registerData.data.token, 'Debe devolver un token de sesión');
     assert.strictEqual(registerData.data.user.email, testEmail);
     assert.strictEqual(registerData.data.user.acceptedTerms, true);
+    const registeredUserId = registerData.data.user.id;
+    cleanupUsers.push(registeredUserId);
     console.log('  [PASS] POST /api/auth/register registra nuevo usuario y retorna token');
 
     // 6.2 Verificación de seguridad criptográfica: la contraseña no debe estar en texto plano
-    const registeredUserInStore = await defaultStore.findById('users', registerData.data.user.id);
+    const registeredUserInStore = await defaultStore.findById('users', registeredUserId);
     assert(registeredUserInStore.password, 'El usuario en la base de datos debe tener password');
     assert.notStrictEqual(registeredUserInStore.password, 'SecurePass123!', 'La contraseña NUNCA debe guardarse en texto plano');
     assert(registeredUserInStore.password.includes(':'), 'La contraseña debe almacenarse en formato criptográfico <salt>:<hash>');
@@ -257,11 +266,14 @@ async function runApiIntegrationTests() {
         password: 'NewSecurePassword456!'
       })
     });
+    const newLoginData = await newLoginCheck.json();
     assert.strictEqual(newLoginCheck.status, 200);
+    assert.strictEqual(newLoginData.success, true);
+    const activeToken = newLoginData.data.token;
     console.log('  [PASS] POST /api/auth/reset-password restablece contraseña y valida nuevo acceso');
 
-    // 8. POST /api/auth/login con usuario preconfigurado Ricardo Henríquez
-    const ricardoLoginRes = await fetch(`${baseUrl}/auth/login`, {
+    // 8. Verificar que no exista la cuenta de prueba legada en la BBDD
+    const demoAccountCheck = await fetch(`${baseUrl}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -269,23 +281,17 @@ async function runApiIntegrationTests() {
         password: 'password123'
       })
     });
-    const ricardoLoginData = await ricardoLoginRes.json();
-    assert.strictEqual(ricardoLoginRes.status, 200);
-    assert.strictEqual(ricardoLoginData.success, true);
-    assert.strictEqual(ricardoLoginData.data.user.id, 'user-ricardo-1');
-    assert.strictEqual(ricardoLoginData.data.user.nombre, 'Ricardo Henríquez');
-    assert.strictEqual(ricardoLoginData.data.user.biometria.peso, 75);
-    const ricardoToken = ricardoLoginData.data.token;
-    console.log('  [PASS] POST /api/auth/login autentica a Ricardo Henríquez');
+    assert.strictEqual(demoAccountCheck.status, 401);
+    console.log('  [PASS] Cuenta de prueba eliminada de la BBDD (rechaza acceso con 401)');
 
     // 9. GET /api/auth/me usando token de autorización
     const meRes = await fetch(`${baseUrl}/auth/me`, {
-      headers: { Authorization: `Bearer ${ricardoToken}` }
+      headers: { Authorization: `Bearer ${activeToken}` }
     });
     const meData = await meRes.json();
     assert.strictEqual(meRes.status, 200);
-    assert.strictEqual(meData.data.id, 'user-ricardo-1');
-    assert.strictEqual(meData.data.email, 'ricardo@ciclometrics.cl');
+    assert.strictEqual(meData.data.id, registeredUserId);
+    assert.strictEqual(meData.data.email, testEmail);
     console.log('  [PASS] GET /api/auth/me resuelve usuario actual con Bearer token');
 
     // 9.1 POST /api/auth/cookie-consent persiste preferencia de cookies en el usuario
@@ -293,11 +299,11 @@ async function runApiIntegrationTests() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${ricardoToken}`
+        Authorization: `Bearer ${activeToken}`
       },
       body: JSON.stringify({
-        userId: 'user-ricardo-1',
-        email: 'ricardo@ciclometrics.cl',
+        userId: registeredUserId,
+        email: testEmail,
         consent: 'accepted'
       })
     });
@@ -306,22 +312,12 @@ async function runApiIntegrationTests() {
     assert.strictEqual(consentData.data.cookieConsent, 'accepted');
     console.log('  [PASS] POST /api/auth/cookie-consent persiste consentimiento de cookies en la base de datos');
 
-    // 10. GET /api/bicycles filtrado por userId
-    const bikesRes = await fetch(`${baseUrl}/bicycles?userId=user-ricardo-1`);
-    const bikesData = await bikesRes.json();
-    assert.strictEqual(bikesRes.status, 200);
-    assert.strictEqual(bikesData.success, true);
-    assert(bikesData.data.length >= 1, 'Ricardo debe tener al menos 1 bicicleta asociada');
-    const ricardoBike = bikesData.data.find((b) => b.id === 'bike-ricardo-1' || b.nombre.includes('Aro 29'));
-    assert(ricardoBike, 'Debe existir la bicicleta preconfigurada Aro 29');
-    console.log('  [PASS] GET /api/bicycles?userId=... devuelve las bicicletas del usuario');
-
-    // 11. POST /api/bicycles (crear nueva bicicleta para Ricardo)
+    // 10. POST /api/bicycles (crear nueva bicicleta para el usuario autenticado)
     const newBikeRes = await fetch(`${baseUrl}/bicycles`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${ricardoToken}`
+        Authorization: `Bearer ${activeToken}`
       },
       body: JSON.stringify({
         nombre: 'Gravel de Competición',
@@ -331,7 +327,7 @@ async function runApiIntegrationTests() {
         ancho_neumatico: 40,
         psi_min: 35,
         psi_max: 65,
-        userId: 'user-ricardo-1'
+        userId: registeredUserId
       })
     });
     const newBikeData = await newBikeRes.json();
@@ -339,7 +335,16 @@ async function runApiIntegrationTests() {
     assert.strictEqual(newBikeData.success, true);
     assert.strictEqual(newBikeData.data.nombre, 'Gravel de Competición');
     const createdBikeId = newBikeData.data.id;
+    cleanupBikes.push(createdBikeId);
     console.log('  [PASS] POST /api/bicycles registra una nueva bicicleta');
+
+    // 11. GET /api/bicycles filtrado por userId
+    const bikesRes = await fetch(`${baseUrl}/bicycles?userId=${registeredUserId}`);
+    const bikesData = await bikesRes.json();
+    assert.strictEqual(bikesRes.status, 200);
+    assert.strictEqual(bikesData.success, true);
+    assert(bikesData.data.length >= 1, 'El usuario debe tener al menos 1 bicicleta asociada');
+    console.log('  [PASS] GET /api/bicycles?userId=... devuelve las bicicletas del usuario');
 
     // 12. DELETE /api/bicycles/:id (eliminar bicicleta recién creada)
     const deleteBikeRes = await fetch(`${baseUrl}/bicycles/${createdBikeId}`, {
@@ -352,6 +357,16 @@ async function runApiIntegrationTests() {
 
     console.log('\nTodas las pruebas de integración API finalizaron con éxito.\n');
   } finally {
+    // Limpiar datos de prueba creados durante la ejecución
+    for (const rId of cleanupRoutes) {
+      await defaultStore.delete('routes', rId).catch(() => {});
+    }
+    for (const bId of cleanupBikes) {
+      await defaultStore.delete('bicycles', bId).catch(() => {});
+    }
+    for (const uId of cleanupUsers) {
+      await defaultStore.delete('users', uId).catch(() => {});
+    }
     server.close();
   }
 }

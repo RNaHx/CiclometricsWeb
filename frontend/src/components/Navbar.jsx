@@ -26,7 +26,7 @@ export default function Navbar({
 }) {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
-  const userNameUpper = (profile?.user?.nombre || 'RICARDO HENRÍQUEZ').toUpperCase();
+  const userNameUpper = (profile?.user?.nombre || 'CICLISTA').toUpperCase();
   const userWeight = profile?.user?.biometria?.peso || 75;
   const userBikeType = profile?.bicycle?.nombre || 'Bici Aro 29';
 
@@ -112,7 +112,7 @@ export default function Navbar({
                     {userNameUpper}
                   </span>
                   <span className="block text-[10px] text-slate-400 truncate">
-                    {profile?.user?.email || 'ricardo@ciclometrics.cl'}
+                    {profile?.user?.email || ''}
                   </span>
                 </div>
                 <button

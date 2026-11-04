@@ -87,8 +87,8 @@ export default function AuthModal({ onAuthSuccess }) {
   const [termsModalSection, setTermsModalSection] = useState('all');
 
   // Login form state
-  const [loginEmail, setLoginEmail] = useState('ricardo@ciclometrics.cl');
-  const [loginPassword, setLoginPassword] = useState('password123');
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
 
   // Register form state
   const [regNombre, setRegNombre] = useState('');
@@ -301,13 +301,6 @@ export default function AuthModal({ onAuthSuccess }) {
     }
   };
 
-  const setDemoCredentials = () => {
-    setLoginEmail('ricardo@ciclometrics.cl');
-    setLoginPassword('password123');
-    setErrorMessage('');
-    setSuccessMessage('');
-  };
-
   const openTermsModal = (section = 'all') => {
     setTermsModalSection(section);
     setIsTermsModalOpen(true);
@@ -455,7 +448,7 @@ export default function AuthModal({ onAuthSuccess }) {
                     spellCheck="false"
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
-                    placeholder="ricardo@ciclometrics.cl"
+                    placeholder="usuario@ciclometrics.cl"
                     className="auth-validated-input w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-3 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
                     required
                   />
@@ -496,8 +489,8 @@ export default function AuthModal({ onAuthSuccess }) {
                 </div>
               </div>
 
-              {/* Enlace de recuperación y Botón de acceso directo para testing / demo */}
-              <div className="flex items-center justify-between text-[11px] text-slate-400 pt-0.5">
+              {/* Enlace de recuperación de contraseña */}
+              <div className="flex items-center justify-end text-[11px] text-slate-400 pt-0.5">
                 <button
                   type="button"
                   onClick={() => {
@@ -509,13 +502,6 @@ export default function AuthModal({ onAuthSuccess }) {
                   className="text-cyan-400 hover:text-cyan-300 hover:underline font-medium transition-colors"
                 >
                   ¿Olvidaste tu contraseña?
-                </button>
-                <button
-                  type="button"
-                  onClick={setDemoCredentials}
-                  className="text-emerald-400 hover:underline font-semibold"
-                >
-                  Usar Cuenta Demo (Ricardo)
                 </button>
               </div>
 
@@ -822,7 +808,7 @@ export default function AuthModal({ onAuthSuccess }) {
                     spellCheck="false"
                     value={recoverEmail}
                     onChange={(e) => setRecoverEmail(e.target.value)}
-                    placeholder="ricardo@ciclometrics.cl"
+                    placeholder="usuario@ciclometrics.cl"
                     className="auth-validated-input w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-3 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all"
                     required
                   />

@@ -6,44 +6,6 @@
 const crypto = require('crypto');
 const { MongoClient, ServerApiVersion } = require('mongodb');
 const config = require('../config/config');
-const { hashPassword } = require('../services/passwordService');
-
-const DEFAULT_SEED_DATA = {
-  users: [
-    {
-      id: 'user-ricardo-1',
-      nombre: 'Ricardo Henríquez',
-      email: 'ricardo@ciclometrics.cl',
-      password: hashPassword('password123'),
-      acceptedTerms: true,
-      termsAcceptedAt: '2026-09-30T00:00:00.000Z',
-      biometria: {
-        peso: 75,
-        altura: 178,
-        edad: 30,
-        genero: 'masculino',
-        nivel: 'intermedio'
-      },
-      createdAt: '2026-09-30T00:00:00.000Z',
-      updatedAt: '2026-09-30T00:00:00.000Z'
-    }
-  ],
-  bicycles: [
-    {
-      id: 'bike-ricardo-1',
-      userId: 'user-ricardo-1',
-      nombre: 'Bici Aro 29',
-      tipo: 'mtb',
-      peso: 10,
-      rodado: '29',
-      ancho_neumatico: 60,
-      psi_min: 30,
-      psi_max: 70,
-      createdAt: '2026-09-30T00:00:00.000Z',
-      updatedAt: '2026-09-30T00:00:00.000Z'
-    }
-  ]
-};
 
 class MongoStore {
   constructor(uri = config.mongoUri, dbName = config.mongoDbName) {
@@ -104,24 +66,19 @@ class MongoStore {
         console.warn('[MongoStore] Aviso al verificar índices:', idxErr.message);
       }
 
-      // Asegurar datos semilla en un clúster nuevo para pruebas inmediatas
+      // Eliminar cuenta de prueba/demo legada si existiera en la colección de MongoDB
       try {
-        const seedUser = DEFAULT_SEED_DATA.users[0];
-        const existingRicardo = await db.collection('users').findOne({
-          $or: [{ id: seedUser.id }, { email: seedUser.email }]
-        });
-
-        if (!existingRicardo) {
-          await db.collection('users').insertOne({ ...seedUser });
-        }
-
-        const seedBike = DEFAULT_SEED_DATA.bicycles[0];
-        const existingBike = await db.collection('bicycles').findOne({ id: seedBike.id });
-        if (!existingBike) {
-          await db.collection('bicycles').insertOne({ ...seedBike });
-        }
-      } catch (seedErr) {
-        console.warn('[MongoStore] Aviso al verificar semilla:', seedErr.message);
+        await Promise.all([
+          db.collection('users').deleteMany({
+            $or: [{ id: 'user-ricardo-1' }, { email: 'ricardo@ciclometrics.cl' }]
+          }),
+          db.collection('bicycles').deleteMany({
+            $or: [{ id: 'bike-ricardo-1' }, { userId: 'user-ricardo-1' }]
+          }),
+          db.collection('routes').deleteMany({ userId: 'user-ricardo-1' })
+        ]);
+      } catch (cleanupErr) {
+        console.warn('[MongoStore] Aviso al limpiar cuenta de prueba:', cleanupErr.message);
       }
 
       this.isInitialized = true;

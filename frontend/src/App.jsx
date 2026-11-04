@@ -19,9 +19,9 @@ import OPTIMAL_ROUTE_VARAS_CRISTOBAL from './data/optimalRouteVarasCristobal.jso
 import { SlidersHorizontal, Zap, RotateCcw, MapPin, Compass } from 'lucide-react';
 
 const DEFAULT_USER = {
-  id: 'user-ricardo-1',
-  nombre: 'Ricardo Henríquez',
-  email: 'ricardo@ciclometrics.cl',
+  id: 'default-cyclist',
+  nombre: 'Ciclista',
+  email: '',
   biometria: {
     peso: 75,
     altura: 178,
@@ -32,7 +32,7 @@ const DEFAULT_USER = {
 };
 
 const DEFAULT_BIKE = {
-  id: 'bike-ricardo-1',
+  id: 'default-bike-1',
   nombre: 'Bici Aro 29',
   tipo: 'mtb',
   peso: 10,
@@ -40,7 +40,7 @@ const DEFAULT_BIKE = {
   ancho_neumatico: 60,
   psi_min: 30,
   psi_max: 70,
-  userId: 'user-ricardo-1'
+  userId: 'default-cyclist'
 };
 
 export default function App() {
