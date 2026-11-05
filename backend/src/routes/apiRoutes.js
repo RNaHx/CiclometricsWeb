@@ -24,6 +24,11 @@ router.get('/health', async (req, res) => {
     service: 'CicloMetrics Backend API',
     version: '1.7.0',
     storage: defaultStore.getEngineInfo(),
+    email: {
+      provider: 'Resend',
+      apiKeyDetected: Boolean(process.env.RESEND_API_KEY),
+      fromEmail: process.env.RESEND_FROM_EMAIL || 'CicloMetrics <onboarding@resend.dev>'
+    },
     timestamp: new Date().toISOString()
   });
 });

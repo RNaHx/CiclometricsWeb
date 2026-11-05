@@ -248,6 +248,8 @@ async function forgotPassword(req, res) {
 
     // Prevenir enumeración de cuentas de usuario
     if (matchingUsers.length === 0) {
+      const allUsers = await defaultStore.find('users');
+      console.warn(`[Auth Mailer] Solicitud de código para '${cleanEmail}' no procesada: el usuario no existe en la base de datos (Total registrados: ${allUsers.length})`);
       return res.status(200).json({
         success: true,
         message: genericMessage
@@ -264,11 +266,20 @@ async function forgotPassword(req, res) {
       resetPasswordAttempts: 0
     });
 
-    await emailService.sendPasswordResetEmail({
+    const emailResult = await emailService.sendPasswordResetEmail({
       to: user.email,
       code,
       expiresMinutes: 15
     });
+
+    if (!emailResult.success && !emailResult.fallback) {
+      const errMsg = typeof emailResult.error === 'string' ? emailResult.error : (emailResult.error?.message || 'Error al despachar correo con Resend');
+      console.error('[Auth Mailer] Error de Resend:', errMsg);
+      return res.status(502).json({
+        success: false,
+        error: `No fue posible despachar el correo con Resend: ${errMsg}`
+      });
+    }
 
     return res.status(200).json({
       success: true,

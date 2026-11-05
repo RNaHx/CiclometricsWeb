@@ -182,6 +182,8 @@ async function sendPasswordResetEmail({ to, code, expiresMinutes = 15 }) {
   const apiKey = process.env.RESEND_API_KEY;
   const fromEmail = process.env.RESEND_FROM_EMAIL || 'CicloMetrics <onboarding@resend.dev>';
 
+  console.log(`[Auth Mailer] Procesando envío de código ${code} para: ${to} | Remitente: ${fromEmail} | API Key detectada: ${Boolean(apiKey)}`);
+
   // Fallback para entornos locales o pruebas sin clave de Resend configurada
   if (!apiKey) {
     console.log('[Auth Mailer - Fallback Local] Código para', to, ':', code);
@@ -204,25 +206,22 @@ async function sendPasswordResetEmail({ to, code, expiresMinutes = 15 }) {
     });
 
     if (result.error) {
-      console.warn('[Auth Mailer - Error Resend]', result.error.message || result.error);
-      console.log('[Auth Mailer - Fallback Local] Código para', to, ':', code);
+      console.error('[Auth Mailer - Error Resend]', result.error.message || result.error);
       return {
-        success: true,
-        fallback: true,
+        success: false,
         error: result.error
       };
     }
 
+    console.log('[Auth Mailer - Éxito Resend] Correo despachado con ID:', result.data?.id);
     return {
       success: true,
       messageId: result.data ? result.data.id : null
     };
   } catch (error) {
-    console.warn('[Auth Mailer - Exception]', error.message);
-    console.log('[Auth Mailer - Fallback Local] Código para', to, ':', code);
+    console.error('[Auth Mailer - Exception]', error.message);
     return {
-      success: true,
-      fallback: true,
+      success: false,
       error: error.message
     };
   }

@@ -458,7 +458,7 @@ export const apiService = {
       });
       return response;
     } catch (error) {
-      if (error.status === 400) {
+      if (error.status) {
         throw error;
       }
       console.warn('Backend no disponible para forgotPassword, simulando fallback offline:', error);
