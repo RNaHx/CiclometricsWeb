@@ -768,6 +768,10 @@ export default function App() {
     setIsCockpitMode(prev => !prev);
   }, []);
 
+  const handleOpenCockpit = useCallback(() => {
+    setIsCockpitMode(true);
+  }, []);
+
   const handleCloseCockpit = useCallback(() => {
     setIsCockpitMode(false);
   }, []);
