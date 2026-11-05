@@ -14,7 +14,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 
-export default function Navbar({
+function Navbar({
   theme,
   onToggleTheme,
   onOpenProfile,
@@ -173,3 +173,4 @@ export default function Navbar({
   );
 }
 
+export default React.memo(Navbar);

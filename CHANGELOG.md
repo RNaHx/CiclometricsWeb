@@ -10,6 +10,19 @@ El formato de versión utilizado es:
 
 ---
 
+## [1.6.4] - 2026-11-04
+### Performance
+- **Optimización Integral de Fluidez y Rendimiento Frontend**:
+  - **Reducción del 75% del Bundle Principal**: De 594 kB a 148 kB mediante división de código (Code-Splitting) y chunks vendors en Vite (`vendor-leaflet`, `vendor-react`, `vendor-icons`).
+  - **Carga Diferida de Modales y Vistas**: Implementación de `React.lazy` y `<Suspense>` para `CockpitView`, `AuthModal`, `ProfileModal`, `AddBicycleModal` y `TermsAndPrivacyModal`.
+  - **Erradicación de Cascadas de Re-renderizados**: Envoltura con `React.memo` en `InteractiveMap`, `ElevationProfileChart`, `RoutePlanningCard`, `MetricsHeaderBar`, `PredictiveHud`, `BicyclesListCard`, `Navbar` y `RouteMapCard`.
+  - **Limitación de Fotogramas por `requestAnimationFrame`**: Throttling de alta precisión en `handleMouseMove` de `ElevationProfileChart` para evitar bloqueos del hilo principal al interactuar con el cursor.
+  - **Cálculos SVG Memoizados**: Optimización con `useMemo` para la geometría de proyección, áreas y trazos de altimetría.
+  - **Caché en Memoria de Rutas Predictivas**: Almacenamiento unívoco en `routeCalculationCache` para conmutación inmediata (0 ms) entre rutas y bicicletas sin re-solicitudes.
+  - **Aceleración por GPU en Mapa**: Inclusión de `transform-gpu` y configuración de amortiguación de teselas (`keepBuffer: 3`, `updateWhenIdle: true`) en Leaflet para transiciones fluidas.
+
+---
+
 ## [1.6.3] - 2026-11-04
 ### Fixed
 - **Cálculo Dinámico de Rutas Óptimas**: Corrección del comportamiento de "Calcular Ruta Óptima" para que calcule e interpola la ruta ciclista exacta entre los campos "Dirección Origen" y "Dirección Destino" (mediante OSRM y Open-Meteo Elevation), eliminando el desvío/secuestro hardcodeado que retornaba la ruta predefinida `Antonio Varas ➔ Cerro San Cristóbal` al buscar direcciones similares o por fallos de georreferenciación.

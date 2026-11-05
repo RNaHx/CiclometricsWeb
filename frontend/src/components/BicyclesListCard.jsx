@@ -1,7 +1,7 @@
 import React from 'react';
 import { Bike, Plus, Trash2, Shield } from 'lucide-react';
 
-export default function BicyclesListCard({
+function BicyclesListCard({
   bicycles = [],
   selectedBikeId,
   onSelectBike,
@@ -106,3 +106,5 @@ export default function BicyclesListCard({
     </div>
   );
 }
+
+export default React.memo(BicyclesListCard);

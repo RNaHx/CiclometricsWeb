@@ -1,7 +1,14 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import { Mountain, TrendingUp, TrendingDown, Minus, Activity } from 'lucide-react';
 
-export default function ElevationProfileChart({
+// Dimensiones estándar del canvas SVG
+const CHART_WIDTH_TOTAL = 800;
+const CHART_HEIGHT_TOTAL = 240;
+const PADDING = { top: 25, right: 35, bottom: 40, left: 55 };
+const CHART_INNER_WIDTH = CHART_WIDTH_TOTAL - PADDING.left - PADDING.right;
+const CHART_INNER_HEIGHT = CHART_HEIGHT_TOTAL - PADDING.top - PADDING.bottom;
+
+function ElevationProfileChart({
   points = [],
   coordinates = [],
   onHoverPoint,
@@ -9,7 +16,193 @@ export default function ElevationProfileChart({
 }) {
   const [hoverIndex, setHoverIndex] = useState(null);
   const svgRef = useRef(null);
+  const rafIdRef = useRef(null);
 
+  // Memoización integral de cálculos geométricos del SVG y dominios
+  const {
+    maxDistance,
+    elevations,
+    minElevationRaw,
+    maxElevationRaw,
+    minElevation,
+    maxElevation,
+    getX,
+    getY,
+    pathD,
+    areaD
+  } = useMemo(() => {
+    if (!points || points.length === 0) {
+      return {
+        maxDistance: 1,
+        elevations: [],
+        minElevationRaw: 0,
+        maxElevationRaw: 0,
+        minElevation: 0,
+        maxElevation: 100,
+        getX: () => PADDING.left,
+        getY: () => PADDING.top,
+        pathD: '',
+        areaD: ''
+      };
+    }
+
+    const maxDist = points[points.length - 1].distance || 1;
+    const elevs = points.map(p => p.elevation);
+    const minRaw = Math.min(...elevs);
+    const maxRaw = Math.max(...elevs);
+
+    // Margen en Y para que el gráfico no toque los bordes superior e inferior
+    const elevRange = Math.max(maxRaw - minRaw, 30);
+    const minElev = Math.max(0, Math.floor((minRaw - elevRange * 0.15) / 10) * 10);
+    const maxElev = Math.ceil((maxRaw + elevRange * 0.15) / 10) * 10;
+    const elevDenominator = maxElev - minElev || 1;
+
+    // Funciones de proyección lineal
+    const calcX = (dist) => PADDING.left + (dist / maxDist) * CHART_INNER_WIDTH;
+    const calcY = (elev) => PADDING.top + CHART_INNER_HEIGHT - ((elev - minElev) / elevDenominator) * CHART_INNER_HEIGHT;
+
+    // Construcción de la ruta SVG para el trazo de contorno
+    let path = '';
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i];
+      const x = calcX(p.distance);
+      const y = calcY(p.elevation);
+      path += (i === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`);
+    }
+
+    const lastX = calcX(points[points.length - 1].distance);
+    const firstX = calcX(points[0].distance);
+    const groundY = PADDING.top + CHART_INNER_HEIGHT;
+    const area = `${path} L ${lastX} ${groundY} L ${firstX} ${groundY} Z`;
+
+    return {
+      maxDistance: maxDist,
+      elevations: elevs,
+      minElevationRaw: minRaw,
+      maxElevationRaw: maxRaw,
+      minElevation: minElev,
+      maxElevation: maxElev,
+      getX: calcX,
+      getY: calcY,
+      pathD: path,
+      areaD: area
+    };
+  }, [points]);
+
+  // Cálculo de pendiente por tramo con ventana mínima de seguridad (40m) y acotada físicamente
+  const getSlope = useCallback((index) => {
+    if (!points || points.length < 2 || index < 0 || index >= points.length) return 0;
+
+    let startIdx = index > 0 ? index - 1 : 0;
+    let endIdx = index > 0 ? index : 1;
+
+    // Si el paso entre puntos consecutivos es menor a 40m, expandir ventana para evitar ruido puntual
+    const minSafeWindow = 40;
+    while (
+      (points[endIdx].distance - points[startIdx].distance) < minSafeWindow &&
+      (startIdx > 0 || endIdx < points.length - 1)
+    ) {
+      if (startIdx > 0) startIdx--;
+      if (endIdx < points.length - 1) endIdx++;
+    }
+
+    const pStart = points[startIdx];
+    const pEnd = points[endIdx];
+    const dDist = pEnd.distance - pStart.distance;
+    const dElev = pEnd.elevation - pStart.elevation;
+
+    if (dDist < 5) return 0;
+
+    const rawSlope = (dElev / dDist) * 100;
+    return Math.max(-30, Math.min(30, rawSlope));
+  }, [points]);
+
+  // Manejo de interacción táctil / mouse limitado por requestAnimationFrame
+  const handleMouseMove = useCallback((e) => {
+    if (!svgRef.current || !points || points.length === 0) return;
+
+    const clientX = e.clientX ?? (e.touches && e.touches[0] ? e.touches[0].clientX : null);
+    if (clientX === null) return;
+
+    if (rafIdRef.current) {
+      cancelAnimationFrame(rafIdRef.current);
+    }
+
+    rafIdRef.current = requestAnimationFrame(() => {
+      if (!svgRef.current) return;
+      const rect = svgRef.current.getBoundingClientRect();
+      const mouseX = clientX - rect.left;
+      const svgX = (mouseX / rect.width) * CHART_WIDTH_TOTAL;
+
+      let closestIdx = 0;
+      let minDiff = Infinity;
+
+      for (let idx = 0; idx < points.length; idx++) {
+        const px = getX(points[idx].distance);
+        const diff = Math.abs(px - svgX);
+        if (diff < minDiff) {
+          minDiff = diff;
+          closestIdx = idx;
+        }
+      }
+
+      setHoverIndex(closestIdx);
+
+      if (onHoverPoint && coordinates && coordinates.length > 0) {
+        const targetCoord = coordinates.length === points.length
+          ? coordinates[closestIdx]
+          : coordinates[Math.min(coordinates.length - 1, Math.round((closestIdx / Math.max(1, points.length - 1)) * (coordinates.length - 1)))];
+        if (targetCoord) {
+          onHoverPoint(targetCoord, closestIdx);
+        }
+      }
+    });
+  }, [points, coordinates, getX, onHoverPoint]);
+
+  const handleMouseLeave = useCallback(() => {
+    if (rafIdRef.current) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
+    setHoverIndex(null);
+    if (onHoverPoint) {
+      onHoverPoint(null, null);
+    }
+  }, [onHoverPoint]);
+
+  useEffect(() => {
+    return () => {
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+      }
+    };
+  }, []);
+
+  const { calculatedAscent, calculatedDescent, maxSlopePct } = useMemo(() => {
+    if (!points || points.length < 2) {
+      return { calculatedAscent: 0, calculatedDescent: 0, maxSlopePct: 0 };
+    }
+    let gain = 0;
+    let loss = 0;
+    let maxS = 0;
+    for (let i = 0; i < points.length - 1; i++) {
+      const diff = points[i + 1].elevation - points[i].elevation;
+      const dDist = points[i + 1].distance - points[i].distance;
+      if (diff > 0) gain += diff;
+      if (diff < 0) loss += Math.abs(diff);
+      if (dDist >= 5) {
+        const s = (diff / dDist) * 100;
+        if (s > maxS) maxS = s;
+      }
+    }
+    return {
+      calculatedAscent: Math.round(gain),
+      calculatedDescent: Math.round(loss),
+      maxSlopePct: Math.min(30, Math.round(maxS * 10) / 10)
+    };
+  }, [points]);
+
+  // Si no hay puntos válidos, renderizamos el empty state
   if (!points || points.length === 0) {
     return (
       <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-lg transition-colors">
@@ -36,129 +229,8 @@ export default function ElevationProfileChart({
     );
   }
 
-  // Dimensiones del canvas SVG
-  const width = 800;
-  const height = 240;
-  const padding = { top: 25, right: 35, bottom: 40, left: 55 };
-
-  const chartWidth = width - padding.left - padding.right;
-  const chartHeight = height - padding.top - padding.bottom;
-
-  // Cálculos de dominios min y max
-  const maxDistance = points[points.length - 1].distance || 1;
-  const elevations = points.map(p => p.elevation);
-  const minElevationRaw = Math.min(...elevations);
-  const maxElevationRaw = Math.max(...elevations);
-
-  // Margen en Y para que el gráfico no toque los extremos
-  const elevRange = Math.max(maxElevationRaw - minElevationRaw, 30);
-  const minElevation = Math.max(0, Math.floor((minElevationRaw - elevRange * 0.15) / 10) * 10);
-  const maxElevation = Math.ceil((maxElevationRaw + elevRange * 0.15) / 10) * 10;
-
-  // Funciones de mapeo
-  const getX = (dist) => padding.left + (dist / maxDistance) * chartWidth;
-  const getY = (elev) => padding.top + chartHeight - ((elev - minElevation) / (maxElevation - minElevation)) * chartHeight;
-
-  // Construcción de la ruta SVG para el polígono de área y la línea de perfil
-  const pathD = points.reduce((acc, p, i) => {
-    const x = getX(p.distance);
-    const y = getY(p.elevation);
-    return i === 0 ? `M ${x} ${y}` : `${acc} L ${x} ${y}`;
-  }, '');
-
-  const areaD = `${pathD} L ${getX(points[points.length - 1].distance)} ${padding.top + chartHeight} L ${getX(points[0].distance)} ${padding.top + chartHeight} Z`;
-
-  // Cálculo de pendiente por tramo con ventana mínima de seguridad (40m) y acotada físicamente
-  const getSlope = (index) => {
-    if (!points || points.length < 2 || index < 0 || index >= points.length) return 0;
-
-    let startIdx = index > 0 ? index - 1 : 0;
-    let endIdx = index > 0 ? index : 1;
-
-    // Si el paso entre puntos consecutivos es menor a 40m, expandir ventana para evitar ruido puntual
-    const minSafeWindow = 40;
-    while (
-      (points[endIdx].distance - points[startIdx].distance) < minSafeWindow &&
-      (startIdx > 0 || endIdx < points.length - 1)
-    ) {
-      if (startIdx > 0) startIdx--;
-      if (endIdx < points.length - 1) endIdx++;
-    }
-
-    const pStart = points[startIdx];
-    const pEnd = points[endIdx];
-    const dDist = pEnd.distance - pStart.distance;
-    const dElev = pEnd.elevation - pStart.elevation;
-
-    if (dDist < 5) return 0;
-
-    const rawSlope = (dElev / dDist) * 100;
-    // Acotar físicamente en el rango [-30%, +30%]
-    return Math.max(-30, Math.min(30, rawSlope));
-  };
-
-  // Manejo de interacción táctil / mouse
-  const handleMouseMove = (e) => {
-    if (!svgRef.current) return;
-    const rect = svgRef.current.getBoundingClientRect();
-    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-    const mouseX = clientX - rect.left;
-    const svgX = (mouseX / rect.width) * width;
-
-    // Buscar el punto más cercano
-    let closestIdx = 0;
-    let minDiff = Infinity;
-
-    points.forEach((p, idx) => {
-      const px = getX(p.distance);
-      const diff = Math.abs(px - svgX);
-      if (diff < minDiff) {
-        minDiff = diff;
-        closestIdx = idx;
-      }
-    });
-
-    setHoverIndex(closestIdx);
-    if (onHoverPoint && coordinates.length > 0) {
-      const targetCoord = coordinates.length === points.length
-        ? coordinates[closestIdx]
-        : coordinates[Math.min(coordinates.length - 1, Math.round((closestIdx / Math.max(1, points.length - 1)) * (coordinates.length - 1)))];
-      if (targetCoord) {
-        onHoverPoint(targetCoord, closestIdx);
-      }
-    }
-  };
-
-  const handleMouseLeave = () => {
-    setHoverIndex(null);
-    if (onHoverPoint) {
-      onHoverPoint(null, null);
-    }
-  };
-
   const activePoint = hoverIndex !== null ? points[hoverIndex] : null;
   const activeSlope = hoverIndex !== null ? getSlope(hoverIndex) : null;
-
-  const { calculatedAscent, calculatedDescent, maxSlopePct } = React.useMemo(() => {
-    let gain = 0;
-    let loss = 0;
-    let maxS = 0;
-    for (let i = 0; i < points.length - 1; i++) {
-      const diff = points[i + 1].elevation - points[i].elevation;
-      const dDist = points[i + 1].distance - points[i].distance;
-      if (diff > 0) gain += diff;
-      if (diff < 0) loss += Math.abs(diff);
-      if (dDist >= 5) {
-        const s = (diff / dDist) * 100;
-        if (s > maxS) maxS = s;
-      }
-    }
-    return {
-      calculatedAscent: Math.round(gain),
-      calculatedDescent: Math.round(loss),
-      maxSlopePct: Math.min(30, Math.round(maxS * 10) / 10)
-    };
-  }, [points]);
 
   return (
     <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-lg transition-colors">
@@ -222,7 +294,7 @@ export default function ElevationProfileChart({
       <div className="relative w-full overflow-hidden select-none">
         <svg
           ref={svgRef}
-          viewBox={`0 0 ${width} ${height}`}
+          viewBox={`0 0 ${CHART_WIDTH_TOTAL} ${CHART_HEIGHT_TOTAL}`}
           className="w-full h-auto cursor-crosshair"
           onMouseMove={handleMouseMove}
           onTouchMove={handleMouseMove}
@@ -239,62 +311,58 @@ export default function ElevationProfileChart({
             {/* Gradiente de la línea del perfil */}
             <linearGradient id="strokeGradient" x1="0" y1="0" x2="1" y2="0">
               <stop offset="0%" stopColor="#10b981" />
-              <stop offset="50%" stopColor="#3b82f6" />
-              <stop offset="100%" stopColor="#f59e0b" />
+              <stop offset="50%" stopColor="#06b6d4" />
+              <stop offset="100%" stopColor="#10b981" />
             </linearGradient>
           </defs>
 
-          {/* Líneas de rejilla horizontal (Altitud) */}
-          {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
-            const y = padding.top + chartHeight * ratio;
-            const elevVal = Math.round(maxElevation - (maxElevation - minElevation) * ratio);
+          {/* Líneas de cuadrícula horizontal (Eje Y) */}
+          {[0, 0.25, 0.5, 0.75, 1].map((ratio, idx) => {
+            const elevValue = Math.round(minElevation + (maxElevation - minElevation) * (1 - ratio));
+            const y = PADDING.top + CHART_INNER_HEIGHT * ratio;
             return (
-              <g key={ratio}>
+              <g key={idx}>
                 <line
-                  x1={padding.left}
+                  x1={PADDING.left}
                   y1={y}
-                  x2={padding.left + chartWidth}
+                  x2={PADDING.left + CHART_INNER_WIDTH}
                   y2={y}
                   stroke={theme === 'dark' ? '#334155' : '#e2e8f0'}
                   strokeDasharray="4 4"
                   strokeWidth="1"
                 />
                 <text
-                  x={padding.left - 8}
+                  x={PADDING.left - 10}
                   y={y + 4}
                   textAnchor="end"
-                  fontSize="11"
-                  fill={theme === 'dark' ? '#94a3b8' : '#64748b'}
-                  fontFamily="system-ui"
+                  className="fill-slate-400 font-mono text-[10px]"
                 >
-                  {elevVal}m
+                  {elevValue} m
                 </text>
               </g>
             );
           })}
 
-          {/* Líneas de rejilla vertical (Distancia km) */}
-          {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
-            const x = padding.left + chartWidth * ratio;
-            const distKm = ((maxDistance * ratio) / 1000).toFixed(1);
+          {/* Líneas de cuadrícula vertical (Eje X) */}
+          {[0, 0.25, 0.5, 0.75, 1].map((ratio, idx) => {
+            const distKm = ((maxDistance / 1000) * ratio).toFixed(1);
+            const x = PADDING.left + CHART_INNER_WIDTH * ratio;
             return (
-              <g key={ratio}>
+              <g key={idx}>
                 <line
                   x1={x}
-                  y1={padding.top}
+                  y1={PADDING.top}
                   x2={x}
-                  y2={padding.top + chartHeight}
+                  y2={PADDING.top + CHART_INNER_HEIGHT}
                   stroke={theme === 'dark' ? '#334155' : '#e2e8f0'}
                   strokeDasharray="4 4"
                   strokeWidth="1"
                 />
                 <text
                   x={x}
-                  y={padding.top + chartHeight + 20}
+                  y={PADDING.top + CHART_INNER_HEIGHT + 20}
                   textAnchor="middle"
-                  fontSize="11"
-                  fill={theme === 'dark' ? '#94a3b8' : '#64748b'}
-                  fontFamily="system-ui"
+                  className="fill-slate-400 font-mono text-[10px]"
                 >
                   {distKm} km
                 </text>
@@ -302,28 +370,35 @@ export default function ElevationProfileChart({
             );
           })}
 
-          {/* Relleno sombreado del perfil */}
-          <path d={areaD} fill="url(#elevGradient)" />
+          {/* Área sombreada bajo el relieve */}
+          {areaD && (
+            <path
+              d={areaD}
+              fill="url(#elevGradient)"
+            />
+          )}
 
-          {/* Línea del perfil de elevación */}
-          <path
-            d={pathD}
-            fill="none"
-            stroke="url(#strokeGradient)"
-            strokeWidth="3.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
+          {/* Trazado continuo del relieve de elevación */}
+          {pathD && (
+            <path
+              d={pathD}
+              fill="none"
+              stroke="url(#strokeGradient)"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          )}
 
-          {/* Línea y punto activo de interacción */}
+          {/* Indicador interactivo dinámico cuando se hace hover */}
           {activePoint && (
             <g>
               {/* Línea vertical guía */}
               <line
                 x1={getX(activePoint.distance)}
-                y1={padding.top}
+                y1={PADDING.top}
                 x2={getX(activePoint.distance)}
-                y2={padding.top + chartHeight}
+                y2={PADDING.top + CHART_INNER_HEIGHT}
                 stroke="#f59e0b"
                 strokeWidth="1.5"
                 strokeDasharray="3 3"
@@ -346,3 +421,5 @@ export default function ElevationProfileChart({
     </div>
   );
 }
+
+export default React.memo(ElevationProfileChart);

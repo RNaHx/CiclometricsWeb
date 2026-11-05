@@ -57,7 +57,7 @@ export const MAP_LAYERS = {
   }
 };
 
-export default function InteractiveMap({
+function InteractiveMap({
   selectedRoute,
   onSelectRoute,
   customRoutePoints,
@@ -123,7 +123,9 @@ export default function InteractiveMap({
         const tileLayer = L.tileLayer(layerConfig.url, {
           attribution: layerConfig.attribution,
           subdomains: layerConfig.subdomains || 'abc',
-          maxZoom: layerConfig.maxZoom || 18
+          maxZoom: layerConfig.maxZoom || 18,
+          keepBuffer: 3,
+          updateWhenIdle: true
         }).addTo(map);
 
         mapInstanceRef.current = map;
@@ -172,7 +174,9 @@ export default function InteractiveMap({
       const newTileLayer = L.tileLayer(layerConfig.url, {
         attribution: layerConfig.attribution,
         subdomains: layerConfig.subdomains || 'abc',
-        maxZoom: layerConfig.maxZoom || 19
+        maxZoom: layerConfig.maxZoom || 19,
+        keepBuffer: 3,
+        updateWhenIdle: true
       }).addTo(map);
 
       map._tileLayer = newTileLayer;
@@ -720,7 +724,7 @@ export default function InteractiveMap({
       {/* Contenedor del Mapa Leaflet (con filtro Dark Mode solo si no es Satélite) */}
       <div 
         ref={mapContainerRef} 
-        className={`w-full h-full relative ${shouldApplyDarkTilesFilter ? 'dark-map-tiles' : ''}`} 
+        className={`w-full h-full relative transform-gpu ${shouldApplyDarkTilesFilter ? 'dark-map-tiles' : ''}`} 
       />
 
       {/* Banner Informativo Inferior Flotante de la Ruta Activa */}
@@ -740,3 +744,5 @@ export default function InteractiveMap({
     </div>
   );
 }
+
+export default React.memo(InteractiveMap);

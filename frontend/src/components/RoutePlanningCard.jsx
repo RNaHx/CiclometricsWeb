@@ -93,7 +93,7 @@ const normalizeText = (str) =>
     .replace(/[\u0300-\u036f]/g, '')
     .trim();
 
-export default function RoutePlanningCard({
+function RoutePlanningCard({
   bicycles = [],
   selectedBikeId,
   onSelectBikeId,
@@ -719,3 +719,5 @@ export default function RoutePlanningCard({
     </div>
   );
 }
+
+export default React.memo(RoutePlanningCard);

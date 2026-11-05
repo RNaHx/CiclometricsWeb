@@ -10,7 +10,7 @@ import {
   Activity
 } from 'lucide-react';
 
-export default function MetricsHeaderBar({
+function MetricsHeaderBar({
   hasRoute,
   calculationData
 }) {
@@ -149,3 +149,5 @@ export default function MetricsHeaderBar({
     </div>
   );
 }
+
+export default React.memo(MetricsHeaderBar);

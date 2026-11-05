@@ -14,7 +14,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 
-export default function PredictiveHud({
+function PredictiveHud({
   calculationData,
   profile,
   isLoading,
@@ -443,3 +443,5 @@ export default function PredictiveHud({
     </div>
   );
 }
+
+export default React.memo(PredictiveHud);

@@ -3,7 +3,7 @@ import { Compass, Eye, EyeOff } from 'lucide-react';
 import InteractiveMap from './InteractiveMap';
 import ErrorBoundary from './ErrorBoundary';
 
-export default function RouteMapCard({
+function RouteMapCard({
   selectedRoute,
   onSelectRoute,
   onSetCustomRoute,
@@ -89,3 +89,4 @@ export default function RouteMapCard({
   );
 }
 
+export default React.memo(RouteMapCard);

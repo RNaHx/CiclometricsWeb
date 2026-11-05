@@ -1,22 +1,23 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react';
 import Navbar from './components/Navbar';
-import AuthModal from './components/AuthModal';
 import RoutePlanningCard from './components/RoutePlanningCard';
 import BicyclesListCard from './components/BicyclesListCard';
-import AddBicycleModal from './components/AddBicycleModal';
 import MetricsHeaderBar from './components/MetricsHeaderBar';
 import RouteMapCard from './components/RouteMapCard';
 import ElevationProfileChart from './components/ElevationProfileChart';
 import PredictiveHud from './components/PredictiveHud';
-import ProfileModal from './components/ProfileModal';
-import CockpitView from './components/CockpitView';
 import ErrorBoundary from './components/ErrorBoundary';
 import CookieConsentBanner from './components/CookieConsentBanner';
-import TermsAndPrivacyModal from './components/TermsAndPrivacyModal';
 import apiService from './services/api';
 import { PRESET_ROUTES } from './data/presetRoutes';
 import OPTIMAL_ROUTE_VARAS_CRISTOBAL from './data/optimalRouteVarasCristobal.json';
 import { SlidersHorizontal, Zap, RotateCcw, MapPin, Compass } from 'lucide-react';
+
+const CockpitView = React.lazy(() => import('./components/CockpitView'));
+const AuthModal = React.lazy(() => import('./components/AuthModal'));
+const ProfileModal = React.lazy(() => import('./components/ProfileModal'));
+const AddBicycleModal = React.lazy(() => import('./components/AddBicycleModal'));
+const TermsAndPrivacyModal = React.lazy(() => import('./components/TermsAndPrivacyModal'));
 
 const DEFAULT_USER = {
   id: 'default-cyclist',
@@ -59,9 +60,9 @@ export default function App() {
     localStorage.setItem('ciclometrics_theme', theme);
   }, [theme]);
 
-  const toggleTheme = () => {
+  const toggleTheme = useCallback(() => {
     setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
-  };
+  }, []);
 
   // 2. SESIÓN DE USUARIO AUTENTICADO Y CONSENTIMIENTO DE COOKIES
   const [currentUser, setCurrentUser] = useState(() => {
@@ -181,15 +182,29 @@ export default function App() {
   const [selectedRoute, setSelectedRoute] = useState(null);
   const [hoverCoordinate, setHoverCoordinate] = useState(null);
 
-  // 7. RESULTADOS DE CÁLCULO PREDICTIVO
+  // 7. RESULTADOS DE CÁLCULO PREDICTIVO Y CACHÉ EN MEMORIA
   const [calculationData, setCalculationData] = useState(null);
   const [isCalculating, setIsCalculating] = useState(false);
   const [calcError, setCalcError] = useState(null);
+  const routeCalculationCache = useRef(new Map());
 
   // Cálculo predictivo de ruta (consume POST /api/routes/calculate o fallback físico-mecánico)
   const calculateMetrics = useCallback(async (routeObj, userProf) => {
     if (!routeObj || !routeObj.points || routeObj.points.length === 0) {
       setCalculationData(null);
+      return;
+    }
+
+    const routeId = routeObj.id || routeObj.name || `${routeObj.origen || ''}_${routeObj.destino || ''}`;
+    const bikeId = userProf?.bicycle?.id || 'nobike';
+    const weight = userProf?.user?.biometria?.peso ?? userProf?.user?.peso ?? 75;
+    const cacheKey = `${routeId}_${bikeId}_${weight}`;
+
+    // Respuesta instantánea si ya fue calculada previamente
+    if (routeCalculationCache.current.has(cacheKey)) {
+      setCalculationData(routeCalculationCache.current.get(cacheKey));
+      setIsCalculating(false);
+      setCalcError(null);
       return;
     }
 
@@ -209,6 +224,7 @@ export default function App() {
     try {
       const response = await apiService.calculateRoute(payload);
       if (response && response.success && response.data) {
+        routeCalculationCache.current.set(cacheKey, response.data);
         setCalculationData(response.data);
       } else {
         throw new Error('Respuesta inválida del servidor');
@@ -286,7 +302,7 @@ export default function App() {
         return Math.max(psiMin, Math.min(psiMax, rawPsi));
       };
 
-      setCalculationData({
+      const localCalculationResult = {
         distancia_km: parseFloat((totalDist / 1000).toFixed(1)),
         desnivel_positivo_m: Math.round(posGain),
         desnivel_negativo_m: Math.round(negGain),
@@ -304,7 +320,10 @@ export default function App() {
           moderateClimb: { distanceKm: parseFloat(moderateDist.toFixed(1)), timeMinutes: parseFloat(moderateTime.toFixed(1)), kcal: Math.round(moderateKcal) },
           steepClimb: { distanceKm: parseFloat(steepDist.toFixed(1)), timeMinutes: parseFloat(steepTime.toFixed(1)), kcal: Math.round(steepKcal) }
         }
-      });
+      };
+
+      routeCalculationCache.current.set(cacheKey, localCalculationResult);
+      setCalculationData(localCalculationResult);
     } finally {
       setIsCalculating(false);
     }
@@ -701,8 +720,8 @@ export default function App() {
     setCookieConsent('session_only');
   };
 
-  // Manejador de logout
-  const handleLogout = () => {
+  // Callbacks memoizados para preservar referencias estables
+  const handleLogout = useCallback(() => {
     apiService.clearSession();
     setCurrentUser(null);
     setCookieConsent(null);
@@ -710,26 +729,78 @@ export default function App() {
     setCalculationData(null);
     setBicycles([]);
     setSelectedBikeId(null);
-  };
+  }, []);
+
+  const handleSelectRoute = useCallback((route) => {
+    setSelectedRoute(route);
+  }, []);
+
+  const handleSetCustomRoute = useCallback((custom) => {
+    setSelectedRoute(custom);
+  }, []);
+
+  const handleHoverPoint = useCallback((coord) => {
+    setHoverCoordinate(coord);
+  }, []);
+
+  const handleSelectBike = useCallback((bikeOrId) => {
+    const id = typeof bikeOrId === 'object' && bikeOrId !== null ? bikeOrId.id : bikeOrId;
+    setSelectedBikeId(id);
+  }, []);
+
+  const handleOpenAddModal = useCallback(() => {
+    setIsAddBikeModalOpen(true);
+  }, []);
+
+  const handleCloseAddModal = useCallback(() => {
+    setIsAddBikeModalOpen(false);
+  }, []);
+
+  const handleOpenProfile = useCallback(() => {
+    setIsProfileOpen(true);
+  }, []);
+
+  const handleCloseProfile = useCallback(() => {
+    setIsProfileOpen(false);
+  }, []);
+
+  const handleToggleCockpit = useCallback(() => {
+    setIsCockpitMode(prev => !prev);
+  }, []);
+
+  const handleCloseCockpit = useCallback(() => {
+    setIsCockpitMode(false);
+  }, []);
+
+  const handleCloseTermsModal = useCallback(() => {
+    setIsTermsModalOpen(false);
+  }, []);
+
+  const handleClearRoute = useCallback(() => {
+    setSelectedRoute(null);
+    setCalculationData(null);
+  }, []);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 transition-colors duration-200 flex flex-col font-sans">
       
       {/* 1. MODAL DE AUTENTICACIÓN (Si no hay sesión activa - Imagen 1) */}
       {!currentUser && (
-        <AuthModal onAuthSuccess={handleAuthSuccess} />
+        <Suspense fallback={null}>
+          <AuthModal onAuthSuccess={handleAuthSuccess} />
+        </Suspense>
       )}
 
       {/* 2. NAVBAR SUPERIOR (Imagen 2) */}
       <Navbar
         theme={theme}
         onToggleTheme={toggleTheme}
-        onOpenProfile={() => setIsProfileOpen(true)}
+        onOpenProfile={handleOpenProfile}
         profile={activeProfile}
         backendStatus={backendStatus}
         onCheckBackend={checkBackendConnectivity}
         isCockpitMode={isCockpitMode}
-        onToggleCockpit={() => setIsCockpitMode(!isCockpitMode)}
+        onToggleCockpit={handleToggleCockpit}
         onLogout={handleLogout}
       />
 
@@ -758,7 +829,7 @@ export default function App() {
             {selectedRoute && (
               <button
                 type="button"
-                onClick={() => { setSelectedRoute(null); setCalculationData(null); }}
+                onClick={handleClearRoute}
                 className="px-3 py-2 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 transition-all flex items-center gap-1.5"
                 title="Limpiar ruta para ver estado inicial"
               >
@@ -767,14 +838,14 @@ export default function App() {
               </button>
             )}
             <button
-              onClick={() => setIsProfileOpen(true)}
+              onClick={handleOpenProfile}
               className="px-3.5 py-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-emerald-500 text-slate-700 dark:text-slate-200 shadow-sm transition-all flex items-center gap-2"
             >
               <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-500" />
               <span>Ajustar Biometría</span>
             </button>
             <button
-              onClick={() => setIsCockpitMode(true)}
+              onClick={handleOpenCockpit}
               className="px-4 py-2 text-xs font-bold rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white shadow-md shadow-emerald-500/20 transition-all flex items-center gap-2"
             >
               <Zap className="w-3.5 h-3.5" />
@@ -795,18 +866,18 @@ export default function App() {
             <RoutePlanningCard
               bicycles={bicycles}
               selectedBikeId={selectedBikeId}
-              onSelectBikeId={setSelectedBikeId}
+              onSelectBikeId={handleSelectBike}
               onCalculateRoute={handleCalculateRoutePlan}
               isCalculating={isCalculating}
-              onOpenAddBikeModal={() => setIsAddBikeModalOpen(true)}
+              onOpenAddBikeModal={handleOpenAddModal}
             />
 
             {/* Tarjeta 2: Mis Bicicletas */}
             <BicyclesListCard
               bicycles={bicycles}
               selectedBikeId={selectedBikeId}
-              onSelectBike={(bike) => setSelectedBikeId(bike.id)}
-              onOpenAddModal={() => setIsAddBikeModalOpen(true)}
+              onSelectBike={handleSelectBike}
+              onOpenAddModal={handleOpenAddModal}
               onDeleteBike={handleDeleteBicycle}
             />
 
@@ -827,8 +898,8 @@ export default function App() {
             <ErrorBoundary>
               <RouteMapCard
                 selectedRoute={selectedRoute}
-                onSelectRoute={(route) => setSelectedRoute(route)}
-                onSetCustomRoute={(custom) => setSelectedRoute(custom)}
+                onSelectRoute={handleSelectRoute}
+                onSetCustomRoute={handleSetCustomRoute}
                 hoverCoordinate={hoverCoordinate}
                 theme={theme}
               />
@@ -839,7 +910,7 @@ export default function App() {
               <ElevationProfileChart
                 points={selectedRoute?.points || []}
                 coordinates={selectedRoute?.coordinates || []}
-                onHoverPoint={(coord) => setHoverCoordinate(coord)}
+                onHoverPoint={handleHoverPoint}
                 theme={theme}
               />
             </ErrorBoundary>
@@ -919,38 +990,59 @@ export default function App() {
       )}
 
       {/* MODAL DE TÉRMINOS DE USO, PRIVACIDAD Y COOKIES (Accesible desde el Footer o Banner) */}
-      <TermsAndPrivacyModal
-        isOpen={isTermsModalOpen}
-        onClose={() => setIsTermsModalOpen(false)}
-        initialSection={termsInitialSection}
-      />
+      <Suspense fallback={null}>
+        {isTermsModalOpen && (
+          <TermsAndPrivacyModal
+            isOpen={isTermsModalOpen}
+            onClose={handleCloseTermsModal}
+            initialSection={termsInitialSection}
+          />
+        )}
+      </Suspense>
 
       {/* MODAL REGISTRO DE BICICLETA */}
-      <AddBicycleModal
-        isOpen={isAddBikeModalOpen}
-        onClose={() => setIsAddBikeModalOpen(false)}
-        onAddBicycle={handleAddBicycle}
-        userId={currentUser?.id || DEFAULT_USER.id}
-      />
+      <Suspense fallback={null}>
+        {isAddBikeModalOpen && (
+          <AddBicycleModal
+            isOpen={isAddBikeModalOpen}
+            onClose={handleCloseAddModal}
+            onAddBicycle={handleAddBicycle}
+            userId={currentUser?.id || DEFAULT_USER.id}
+          />
+        )}
+      </Suspense>
 
       {/* MODAL AJUSTE DE BIOMETRÍA */}
-      <ProfileModal
-        isOpen={isProfileOpen}
-        onClose={() => setIsProfileOpen(false)}
-        profile={activeProfile}
-        onSaveProfile={handleSaveProfile}
-        isSaving={false}
-      />
+      <Suspense fallback={null}>
+        {isProfileOpen && (
+          <ProfileModal
+            isOpen={isProfileOpen}
+            onClose={handleCloseProfile}
+            profile={activeProfile}
+            onSaveProfile={handleSaveProfile}
+            isSaving={false}
+          />
+        )}
+      </Suspense>
 
       {/* SIMULADOR COCKPIT / MANILLAR MÓVIL FULLSCREEN */}
-      {isCockpitMode && (
-        <CockpitView
-          calculationData={calculationData}
-          profile={activeProfile}
-          selectedRoute={selectedRoute}
-          onClose={() => setIsCockpitMode(false)}
-        />
-      )}
+      <Suspense fallback={
+        <div className="fixed inset-0 z-50 bg-slate-950 flex items-center justify-center text-white">
+          <div className="flex items-center gap-3">
+            <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+            <span className="text-sm font-bold">Cargando Cockpit...</span>
+          </div>
+        </div>
+      }>
+        {isCockpitMode && (
+          <CockpitView
+            calculationData={calculationData}
+            profile={activeProfile}
+            selectedRoute={selectedRoute}
+            onClose={handleCloseCockpit}
+          />
+        )}
+      </Suspense>
 
     </div>
   );
