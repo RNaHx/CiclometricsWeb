@@ -32,6 +32,8 @@ router.get('/health', async (req, res) => {
   else if (process.env.RESEND_TOKEN) keyVariable = 'RESEND_TOKEN';
   else if (process.env.RESEND_APIKEY) keyVariable = 'RESEND_APIKEY';
 
+  const matchingEnvKeys = Object.keys(process.env).filter(k => /resend|mail/i.test(k));
+
   res.json({
     status: 'ok',
     service: 'CicloMetrics Backend API',
@@ -41,6 +43,7 @@ router.get('/health', async (req, res) => {
       provider: 'Resend',
       apiKeyDetected: Boolean(resendKey),
       keyVariable,
+      matchingEnvKeysFound: matchingEnvKeys,
       fromEmail: process.env.RESEND_FROM_EMAIL || 'CicloMetrics <onboarding@resend.dev>'
     },
     timestamp: new Date().toISOString()
