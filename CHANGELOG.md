@@ -10,6 +10,22 @@ El formato de versión utilizado es:
 
 ---
 
+## [1.7.0] - 2026-11-04
+### Added
+- **Recuperación Robusta de Contraseñas con Resend y Códigos OTP**:
+  - Implementación del servicio transaccional [`backend/src/services/emailService.js`](file:///c:/Users/ricar/OneDrive/Desktop/CiclometricsWeb/backend/src/services/emailService.js) mediante la API oficial de Resend (`RESEND_API_KEY`).
+  - Plantilla HTML responsiva con identidad visual oscura de CicloMetrics, acentos en verde esmeralda y cian, recuadro destacado de código OTP y advertencias de seguridad.
+  - Generación de código numérico aleatorio seguro de 6 dígitos con expiración de 15 minutos (`crypto.randomInt`).
+  - Almacenamiento protegido mediante hash SHA-256 en la base de datos (MongoDB Atlas y JSON local) para prevenir filtraciones de tokens en texto plano.
+  - Protección contra fuerza bruta con límite de 5 intentos fallidos antes de anular el token (`429 Too Many Requests`).
+  - Prevención de enumeración de cuentas en `POST /api/auth/forgot-password` retornando respuestas 200 OK uniformes.
+  - Flujo visual interactivo de 2 pasos en [`frontend/src/components/AuthModal.jsx`](file:///c:/Users/ricar/OneDrive/Desktop/CiclometricsWeb/frontend/src/components/AuthModal.jsx):
+    - **Paso 1**: Solicitud de código con input de correo y enlace de regreso al login.
+    - **Paso 2**: Validación de código OTP con formato monoespaciado centrado, temporizador de expiración en tiempo real (15 min), botón de reenvío con cooldown de 60 segundos, e inputs de nueva contraseña con visualización segura *Hold-to-Reveal* y checklist de cumplimiento en tiempo real.
+  - Resiliencia Zero-Crash con emulación por consola en entornos de prueba o desarrollo local sin credenciales.
+
+---
+
 ## [1.6.4] - 2026-11-04
 ### Performance
 - **Optimización Integral de Fluidez y Rendimiento Frontend**:

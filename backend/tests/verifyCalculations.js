@@ -21,7 +21,7 @@ const {
   REAR_LOAD_RATIO
 } = require('../src/calculators/tirePressureCalculator');
 const { analyzeRoute } = require('../src/calculators/routeAnalyzer');
-const { validateUser, validateBicycle } = require('../src/models/validators');
+const { validateUser, validateBicycle, validateForgotPassword, validateResetPassword } = require('../src/models/validators');
 
 let passedTests = 0;
 let totalTests = 0;
@@ -183,6 +183,34 @@ test('Rechaza bicicleta con especificaciones incoherentes (psi_max <= psi_min)',
     psi_max: 80 // Error: max menor que min
   });
   assert.strictEqual(invalidBike.isValid, false);
+});
+
+test('Valida formato de email en forgot-password', () => {
+  const invalid = validateForgotPassword({ email: 'invalido' });
+  assert.strictEqual(invalid.isValid, false);
+
+  const valid = validateForgotPassword({ email: 'usuario@ciclometrics.com' });
+  assert.strictEqual(valid.isValid, true);
+  assert.strictEqual(valid.sanitized.email, 'usuario@ciclometrics.com');
+});
+
+test('Valida requerimientos de código de 6 dígitos y contraseña segura en reset-password', () => {
+  const invalidCode = validateResetPassword({
+    email: 'user@test.com',
+    code: '123',
+    newPassword: 'SecurePass123!'
+  });
+  assert.strictEqual(invalidCode.isValid, false);
+  assert(invalidCode.errors.some(e => e.includes('6 dígitos')));
+
+  const valid = validateResetPassword({
+    email: 'user@test.com',
+    code: '123456',
+    newPassword: 'SecurePass123!',
+    confirmPassword: 'SecurePass123!'
+  });
+  assert.strictEqual(valid.isValid, true);
+  assert.strictEqual(valid.sanitized.code, '123456');
 });
 
 console.log('\n--- 5. Pruebas Integradas de Route Analyzer ---');

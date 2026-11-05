@@ -212,6 +212,26 @@ function validateBicycle(data) {
   };
 }
 
+function validateForgotPassword(data) {
+  const errors = [];
+  if (!data || typeof data !== 'object') {
+    return { isValid: false, errors: ['El cuerpo de la solicitud es obligatorio.'] };
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!data.email || typeof data.email !== 'string' || !emailRegex.test(data.email.trim())) {
+    errors.push('El correo electrónico no tiene un formato válido.');
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+    sanitized: {
+      email: data.email ? String(data.email).trim().toLowerCase() : ''
+    }
+  };
+}
+
 function validateResetPassword(data) {
   const errors = [];
   if (!data || typeof data !== 'object') {
@@ -221,6 +241,11 @@ function validateResetPassword(data) {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!data.email || typeof data.email !== 'string' || !emailRegex.test(data.email.trim())) {
     errors.push('El correo electrónico no tiene un formato válido.');
+  }
+
+  const rawCode = data.code !== undefined && data.code !== null ? String(data.code).trim() : '';
+  if (!rawCode || !/^\d{6}$/.test(rawCode)) {
+    errors.push('El código de verificación de 6 dígitos es obligatorio.');
   }
 
   const pwdCheck = validatePasswordStrength(data.newPassword);
@@ -239,6 +264,7 @@ function validateResetPassword(data) {
     errors,
     sanitized: {
       email: data.email ? String(data.email).trim().toLowerCase() : '',
+      code: rawCode,
       newPassword: data.newPassword ? String(data.newPassword).trim() : ''
     }
   };
@@ -252,6 +278,7 @@ module.exports = {
   validatePasswordStrength,
   validateUser,
   validateBicycle,
+  validateForgotPassword,
   validateResetPassword
 };
 

@@ -3,9 +3,11 @@
  * Controlador para autenticación y sesiones de usuario en CicloMetrics Web
  */
 
+const crypto = require('crypto');
 const { defaultStore } = require('../storage/jsonStore');
-const { validateUser, validateResetPassword } = require('../models/validators');
+const { validateUser, validateForgotPassword, validateResetPassword } = require('../models/validators');
 const { hashPassword, verifyPassword } = require('../services/passwordService');
+const emailService = require('../services/emailService');
 
 function generateToken(userId) {
   const timestamp = Date.now();
@@ -46,7 +48,13 @@ function extractUserIdFromRequest(req) {
 
 function sanitizeUserResponse(user) {
   if (!user) return null;
-  const { password, ...safeUser } = user;
+  const {
+    password,
+    resetPasswordToken,
+    resetPasswordExpires,
+    resetPasswordAttempts,
+    ...safeUser
+  } = user;
   return safeUser;
 }
 
@@ -217,11 +225,69 @@ async function me(req, res) {
   }
 }
 
+async function forgotPassword(req, res) {
+  try {
+    const { email } = req.body || {};
+
+    const validation = validateForgotPassword({ email });
+    if (!validation.isValid) {
+      return res.status(400).json({
+        success: false,
+        error: 'Datos de solicitud inválidos.',
+        details: validation.errors
+      });
+    }
+
+    const { email: cleanEmail } = validation.sanitized;
+    const genericMessage = 'Si el correo está registrado, hemos enviado un código de verificación de 6 dígitos válido por 15 minutos.';
+
+    const matchingUsers = await defaultStore.find(
+      'users',
+      (u) => u.email && u.email.toLowerCase() === cleanEmail
+    );
+
+    // Prevenir enumeración de cuentas de usuario
+    if (matchingUsers.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: genericMessage
+      });
+    }
+
+    const user = matchingUsers[0];
+    const code = crypto.randomInt(100000, 1000000).toString();
+    const codeHash = crypto.createHash('sha256').update(code).digest('hex');
+
+    await defaultStore.update('users', user.id, {
+      resetPasswordToken: codeHash,
+      resetPasswordExpires: Date.now() + 15 * 60 * 1000,
+      resetPasswordAttempts: 0
+    });
+
+    await emailService.sendPasswordResetEmail({
+      to: user.email,
+      code,
+      expiresMinutes: 15
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: genericMessage
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: 'Error interno al procesar recuperación de contraseña.',
+      details: error.message
+    });
+  }
+}
+
 async function resetPassword(req, res) {
   try {
-    const { email, newPassword, confirmPassword } = req.body || {};
+    const { email, code, newPassword, confirmPassword } = req.body || {};
 
-    const validation = validateResetPassword({ email, newPassword, confirmPassword });
+    const validation = validateResetPassword({ email, code, newPassword, confirmPassword });
     if (!validation.isValid) {
       return res.status(400).json({
         success: false,
@@ -230,7 +296,7 @@ async function resetPassword(req, res) {
       });
     }
 
-    const { email: cleanEmail, newPassword: cleanNewPassword } = validation.sanitized;
+    const { email: cleanEmail, code: cleanCode, newPassword: cleanNewPassword } = validation.sanitized;
 
     const matchingUsers = await defaultStore.find(
       'users',
@@ -238,15 +304,81 @@ async function resetPassword(req, res) {
     );
 
     if (matchingUsers.length === 0) {
-      return res.status(404).json({
+      return res.status(400).json({
         success: false,
-        error: 'No se encontró ninguna cuenta asociada a este correo electrónico.'
+        error: 'No se encontró ninguna cuenta asociada o solicitud activa para este correo.'
       });
     }
 
     const targetUser = matchingUsers[0];
+
+    // Verificar si el usuario tiene un token activo
+    if (!targetUser.resetPasswordToken) {
+      return res.status(400).json({
+        success: false,
+        error: 'No hay ninguna solicitud de restablecimiento activa para esta cuenta. Solicite un nuevo código.'
+      });
+    }
+
+    // Verificar si el token ya expiró
+    if (!targetUser.resetPasswordExpires || Date.now() > targetUser.resetPasswordExpires) {
+      await defaultStore.update('users', targetUser.id, {
+        resetPasswordToken: null,
+        resetPasswordExpires: null,
+        resetPasswordAttempts: 0
+      });
+      return res.status(400).json({
+        success: false,
+        error: 'El código de verificación ha expirado. Solicite uno nuevo.'
+      });
+    }
+
+    // Verificar límite de intentos fallidos
+    const currentAttempts = targetUser.resetPasswordAttempts || 0;
+    if (currentAttempts >= 5) {
+      await defaultStore.update('users', targetUser.id, {
+        resetPasswordToken: null,
+        resetPasswordExpires: null,
+        resetPasswordAttempts: 0
+      });
+      return res.status(429).json({
+        success: false,
+        error: 'Demasiados intentos fallidos. Solicite un nuevo código.'
+      });
+    }
+
+    // Verificar coincidencia del código mediante hash criptográfico SHA-256
+    const inputHash = crypto.createHash('sha256').update(cleanCode).digest('hex');
+    if (inputHash !== targetUser.resetPasswordToken) {
+      const nextAttempts = currentAttempts + 1;
+      if (nextAttempts >= 5) {
+        await defaultStore.update('users', targetUser.id, {
+          resetPasswordToken: null,
+          resetPasswordExpires: null,
+          resetPasswordAttempts: 0
+        });
+        return res.status(429).json({
+          success: false,
+          error: 'Demasiados intentos fallidos. Solicite un nuevo código.'
+        });
+      }
+
+      await defaultStore.update('users', targetUser.id, {
+        resetPasswordAttempts: nextAttempts
+      });
+
+      return res.status(400).json({
+        success: false,
+        error: 'Código de verificación incorrecto.'
+      });
+    }
+
+    // Código válido: actualizar contraseña y limpiar datos de recuperación
     const updatedUser = await defaultStore.update('users', targetUser.id, {
-      password: hashPassword(cleanNewPassword)
+      password: hashPassword(cleanNewPassword),
+      resetPasswordToken: null,
+      resetPasswordExpires: null,
+      resetPasswordAttempts: 0
     });
 
     return res.status(200).json({
@@ -316,6 +448,7 @@ module.exports = {
   register,
   login,
   me,
+  forgotPassword,
   resetPassword,
   saveCookieConsent
 };

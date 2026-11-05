@@ -7,6 +7,14 @@ const assert = require('assert');
 const http = require('http');
 const app = require('../src/app');
 const { defaultStore } = require('../src/storage/jsonStore');
+const emailService = require('../src/services/emailService');
+
+let lastOtpCode = null;
+const originalSendEmail = emailService.sendPasswordResetEmail;
+emailService.sendPasswordResetEmail = async (params) => {
+  lastOtpCode = params.code;
+  return originalSendEmail(params);
+};
 
 async function runApiIntegrationTests() {
   await defaultStore.init();
@@ -211,33 +219,65 @@ async function runApiIntegrationTests() {
     assert.strictEqual(badLoginRes.status, 401);
     console.log('  [PASS] POST /api/auth/login rechaza credenciales incorrectas (401)');
 
-    // 7.1 POST /api/auth/reset-password valida email inexistente (404) y password débil (400)
-    const resetNotFoundRes = await fetch(`${baseUrl}/auth/reset-password`, {
+    // 7.1 POST /api/auth/forgot-password solicita código OTP de 6 dígitos y previene enumeración de usuarios
+    const forgotNonExistentRes = await fetch(`${baseUrl}/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'inexistente@correo.com' })
+    });
+    const forgotNonExistentData = await forgotNonExistentRes.json();
+    assert.strictEqual(forgotNonExistentRes.status, 200);
+    assert.strictEqual(forgotNonExistentData.success, true);
+    assert(forgotNonExistentData.message.includes('código de verificación'));
+
+    // Solicitud válida para el usuario registrado
+    const forgotSuccessRes = await fetch(`${baseUrl}/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: testEmail })
+    });
+    const forgotSuccessData = await forgotSuccessRes.json();
+    assert.strictEqual(forgotSuccessRes.status, 200);
+    assert.strictEqual(forgotSuccessData.success, true);
+    assert(lastOtpCode && /^\d{6}$/.test(lastOtpCode), 'El código OTP generado debe contener 6 dígitos numéricos');
+    console.log('  [PASS] POST /api/auth/forgot-password genera código OTP de 6 dígitos y previene enumeración');
+
+    // 7.2 POST /api/auth/reset-password validaciones de seguridad y restablecimiento exitoso
+    // a) Código incorrecto -> responde 400
+    const resetWrongCodeRes = await fetch(`${baseUrl}/auth/reset-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        email: 'inexistente@correo.com',
-        newPassword: 'NuevaPassword123!'
+        email: testEmail,
+        code: '999999',
+        newPassword: 'NewSecurePassword456!',
+        confirmPassword: 'NewSecurePassword456!'
       })
     });
-    assert.strictEqual(resetNotFoundRes.status, 404);
+    assert.strictEqual(resetWrongCodeRes.status, 400);
+    const resetWrongCodeData = await resetWrongCodeRes.json();
+    assert.strictEqual(resetWrongCodeData.error, 'Código de verificación incorrecto.');
 
+    // b) Contraseña débil -> responde 400
     const resetBadPassRes = await fetch(`${baseUrl}/auth/reset-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         email: testEmail,
-        newPassword: 'sin_mayuscula_ni_num' // Inválida según política
+        code: lastOtpCode,
+        newPassword: 'sin_mayuscula_ni_num', // Inválida según política
+        confirmPassword: 'sin_mayuscula_ni_num'
       })
     });
     assert.strictEqual(resetBadPassRes.status, 400);
 
-    // 7.2 POST /api/auth/reset-password restablece contraseña de usuario existente
+    // c) Restablecimiento exitoso con código válido
     const resetSuccessRes = await fetch(`${baseUrl}/auth/reset-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         email: testEmail,
+        code: lastOtpCode,
         newPassword: 'NewSecurePassword456!',
         confirmPassword: 'NewSecurePassword456!'
       })
@@ -245,6 +285,19 @@ async function runApiIntegrationTests() {
     const resetSuccessData = await resetSuccessRes.json();
     assert.strictEqual(resetSuccessRes.status, 200);
     assert.strictEqual(resetSuccessData.success, true);
+
+    // d) El código usado ya no puede reutilizarse (queda invalidado)
+    const resetReplayRes = await fetch(`${baseUrl}/auth/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: testEmail,
+        code: lastOtpCode,
+        newPassword: 'AnotherPassword789!',
+        confirmPassword: 'AnotherPassword789!'
+      })
+    });
+    assert.strictEqual(resetReplayRes.status, 400);
 
     // Verificar que el login con contraseña antigua falle (401)
     const oldLoginCheck = await fetch(`${baseUrl}/auth/login`, {
@@ -270,7 +323,7 @@ async function runApiIntegrationTests() {
     assert.strictEqual(newLoginCheck.status, 200);
     assert.strictEqual(newLoginData.success, true);
     const activeToken = newLoginData.data.token;
-    console.log('  [PASS] POST /api/auth/reset-password restablece contraseña y valida nuevo acceso');
+    console.log('  [PASS] POST /api/auth/reset-password valida OTP, restablece contraseña e invalida código usado');
 
     // 8. Verificar que no exista la cuenta de prueba legada en la BBDD
     const demoAccountCheck = await fetch(`${baseUrl}/auth/login`, {

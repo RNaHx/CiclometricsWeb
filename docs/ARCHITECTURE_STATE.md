@@ -79,7 +79,8 @@ $$\text{kCal} = MET \times (M_{\text{usuario}} + M_{\text{bicicleta}}) \times \D
 | `GET` | `/api/health` | Estado del servicio backend | Pública |
 | `POST` | `/api/auth/register` | Registro de nuevo usuario y biometría | Pública |
 | `POST` | `/api/auth/login` | Login con email y contraseña, retorna token | Pública |
-| `POST` | `/api/auth/reset-password` | Restablecimiento directo de contraseña olvidada por correo | Pública |
+| `POST` | `/api/auth/forgot-password` | Genera código OTP de 6 dígitos con expiración (15 min) y envía email vía Resend | Pública |
+| `POST` | `/api/auth/reset-password` | Restablece contraseña validando código OTP temporal de 6 dígitos | Pública |
 | `GET` | `/api/auth/me` | Obtiene el perfil del usuario autenticado | `Bearer <token>` / `x-user-id` |
 | `POST` | `/api/profile` | Crea perfil de usuario y bicicleta inicial | Pública |
 | `GET` | `/api/profile/:id` | Consulta perfil de usuario y bicicletas | Pública / Privada |

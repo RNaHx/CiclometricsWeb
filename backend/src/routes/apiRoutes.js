@@ -22,7 +22,7 @@ router.get('/health', async (req, res) => {
   res.json({
     status: 'ok',
     service: 'CicloMetrics Backend API',
-    version: '1.6.4',
+    version: '1.7.0',
     storage: defaultStore.getEngineInfo(),
     timestamp: new Date().toISOString()
   });
@@ -31,6 +31,7 @@ router.get('/health', async (req, res) => {
 // Endpoints de autenticación y sesión
 router.post('/auth/register', authController.register);
 router.post('/auth/login', authController.login);
+router.post('/auth/forgot-password', authController.forgotPassword);
 router.post('/auth/reset-password', authController.resetPassword);
 router.post('/auth/cookie-consent', authController.saveCookieConsent);
 router.get('/auth/me', authController.me);

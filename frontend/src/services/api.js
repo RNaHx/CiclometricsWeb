@@ -449,39 +449,42 @@ export const apiService = {
     }
   },
 
-  async resetPassword({ email, newPassword, confirmPassword }) {
+  async forgotPassword(email) {
     const cleanEmail = (email || '').trim().toLowerCase();
+    try {
+      const response = await request('/auth/forgot-password', {
+        method: 'POST',
+        body: JSON.stringify({ email: cleanEmail })
+      });
+      return response;
+    } catch (error) {
+      if (error.status === 400) {
+        throw error;
+      }
+      console.warn('Backend no disponible para forgotPassword, simulando fallback offline:', error);
+      return {
+        success: true,
+        message: 'Si el correo está registrado, recibirás un código de verificación de 6 dígitos válido por 15 minutos.'
+      };
+    }
+  },
+
+  async resetPassword({ email, code, newPassword, confirmPassword }) {
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanCode = (code || '').toString().trim();
     try {
       const response = await request('/auth/reset-password', {
         method: 'POST',
-        body: JSON.stringify({ email, newPassword, confirmPassword })
+        body: JSON.stringify({
+          email: cleanEmail,
+          code: cleanCode,
+          newPassword,
+          confirmPassword
+        })
       });
       this._saveAccountToRegistry({ email: cleanEmail, password: newPassword });
       return response;
     } catch (error) {
-      // Si el contenedor efímero (/tmp) perdió el usuario pero está en el registro del navegador, recrearlo con la nueva contraseña
-      if (error.status === 404 && cleanEmail) {
-        const registry = this._getAccountsRegistry();
-        const cached = registry[cleanEmail];
-        if (cached) {
-          const syncRes = await request('/auth/register', {
-            method: 'POST',
-            body: JSON.stringify({
-              ...cached,
-              password: newPassword,
-              confirmPassword: confirmPassword || newPassword,
-              acceptedTerms: true
-            })
-          });
-          if (syncRes?.success) {
-            this._saveAccountToRegistry({ ...cached, password: newPassword });
-            return {
-              success: true,
-              message: 'Contraseña restablecida y cuenta sincronizada exitosamente.'
-            };
-          }
-        }
-      }
       if (error.status === 400 || error.status === 404) {
         throw error;
       }
@@ -529,7 +532,7 @@ export const apiService = {
             const userBikes = userId ? parsed.filter(b => !b.userId || b.userId === userId) : parsed;
             return { success: true, count: userBikes.length, data: userBikes };
           }
-        } catch (e) {
+        } catch {
           // continuar a fallback
         }
       }
