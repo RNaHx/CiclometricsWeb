@@ -22,7 +22,7 @@ router.get('/health', async (req, res) => {
   res.json({
     status: 'ok',
     service: 'CicloMetrics Backend API',
-    version: '1.6.2',
+    version: '1.6.3',
     storage: defaultStore.getEngineInfo(),
     timestamp: new Date().toISOString()
   });

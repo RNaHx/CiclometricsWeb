@@ -448,29 +448,6 @@ export default function App() {
   const handleCalculateRoutePlan = async ({ type, origen, destino, origenCoords, destinoCoords }) => {
     setIsCalculating(true);
 
-    const normOrigen = (origen || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    const normDestino = (destino || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-
-    // Solo usar la ruta predefinida calibrada cuando TANTO el origen es Antonio Varas COMO el destino es Cerro San Cristóbal
-    const isExactVarasCristobal =
-      (type === 'direcciones' &&
-        normOrigen.includes('varas') &&
-        normDestino.includes('cristobal')) ||
-      (type === 'coordenadas' &&
-        origenCoords && destinoCoords &&
-        Math.abs(origenCoords[0] - (-33.435)) < 0.015 &&
-        Math.abs(origenCoords[1] - (-70.615)) < 0.015 &&
-        Math.abs(destinoCoords[0] - (-33.424)) < 0.015 &&
-        Math.abs(destinoCoords[1] - (-70.632)) < 0.015);
-
-    if (isExactVarasCristobal) {
-      setTimeout(() => {
-        setSelectedRoute(OPTIMAL_ROUTE_VARAS_CRISTOBAL);
-        setIsCalculating(false);
-      }, 300);
-      return;
-    }
-
     // Resolver coordenadas de origen y destino (ya sea desde autocompletado, direcciones geocodificadas o coordenadas directas)
     let resolvedOrigenCoords = origenCoords;
     let resolvedDestinoCoords = destinoCoords;
@@ -484,147 +461,192 @@ export default function App() {
       resolvedDestinoCoords = geoDest;
     }
 
-    // Si contamos con coordenadas válidas para origen y destino, trazar ruta ciclista real vía OSRM + Open-Meteo Elevation
-    if (resolvedOrigenCoords && resolvedDestinoCoords) {
-      const lat1 = resolvedOrigenCoords[0], lon1 = resolvedOrigenCoords[1];
-      const lat2 = resolvedDestinoCoords[0], lon2 = resolvedDestinoCoords[1];
-
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
-        const osrmUrl = `https://router.project-osrm.org/route/v1/bicycle/${lon1},${lat1};${lon2},${lat2}?overview=full&geometries=geojson`;
-        const response = await fetch(osrmUrl, { signal: controller.signal });
-        clearTimeout(timeoutId);
-
-        if (response.ok) {
-          const data = await response.json();
-          if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
-            const routeData = data.routes[0];
-            const rawCoords = routeData.geometry.coordinates;
-            const coords = rawCoords.map(([lon, lat]) => [
-              parseFloat(lat.toFixed(5)),
-              parseFloat(lon.toFixed(5))
-            ]);
-
-            const haversine = (c1, c2) => {
-              const R = 6371e3;
-              const p1 = (c1[0] * Math.PI) / 180;
-              const p2 = (c2[0] * Math.PI) / 180;
-              const dp = ((c2[0] - c1[0]) * Math.PI) / 180;
-              const dl = ((c2[1] - c1[1]) * Math.PI) / 180;
-              const a = Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
-              return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            };
-
-            const cumDist = [0];
-            for (let i = 1; i < coords.length; i++) {
-              cumDist.push(cumDist[i - 1] + haversine(coords[i - 1], coords[i]));
-            }
-            const totalDistMeters = Math.round(routeData.distance || cumDist[cumDist.length - 1]);
-
-            const getFallbackAlt = (lat, lng, progressFraction) => {
-              const isHill = lat > -33.435 && lat < -33.415 && lng > -70.645 && lng < -70.615;
-              if (isHill && progressFraction > 0.39) {
-                const hProg = (progressFraction - 0.39) / 0.61;
-                return Math.round(630 + hProg * 188);
-              }
-              const eastFactor = (-70.50 - lng) / (-70.50 - -70.75);
-              const northFactor = (-33.35 - lat) / (-33.35 - -33.55);
-              const baseElev = 520 + (1 - eastFactor) * 220 + (1 - northFactor) * 60;
-              return Math.round(baseElev + Math.sin(lat * 1200) * 6 + Math.cos(lng * 1200) * 6);
-            };
-
-            const numSamples = Math.min(40, Math.max(16, Math.floor(totalDistMeters / 250)));
-            const sampledNodes = [];
-            for (let s = 0; s <= numSamples; s++) {
-              const targetDist = (s / numSamples) * totalDistMeters;
-              let bestIdx = 0;
-              let minDiff = Infinity;
-              for (let i = 0; i < cumDist.length; i++) {
-                const diff = Math.abs(cumDist[i] - targetDist);
-                if (diff < minDiff) {
-                  minDiff = diff;
-                  bestIdx = i;
-                }
-              }
-              sampledNodes.push({
-                distance: Math.round(targetDist),
-                coord: coords[bestIdx],
-                frac: s / numSamples
-              });
-            }
-
-            // Consultar elevaciones reales a Open-Meteo Elevation API (SRTM/Copernicus DEM)
-            let elevations = null;
-            try {
-              const latsParam = sampledNodes.map(n => n.coord[0]).join(',');
-              const lonsParam = sampledNodes.map(n => n.coord[1]).join(',');
-              const elevRes = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${latsParam}&longitude=${lonsParam}`);
-              if (elevRes.ok) {
-                const elevData = await elevRes.json();
-                if (Array.isArray(elevData.elevation) && elevData.elevation.length === sampledNodes.length) {
-                  const rawElevs = elevData.elevation.map(e => Number(e));
-                  // Suavizado de media móvil ponderada en puntos intermedios para evitar dientes de sierra DEM
-                  elevations = rawElevs.map((val, idx) => {
-                    if (idx === 0 || idx === rawElevs.length - 1) return Math.round(val);
-                    return Math.round(rawElevs[idx - 1] * 0.25 + val * 0.5 + rawElevs[idx + 1] * 0.25);
-                  });
-                }
-              }
-            } catch (elevErr) {
-              console.warn('Open-Meteo Elevation fallback:', elevErr);
-            }
-
-            const points = sampledNodes.map((node, idx) => ({
-              distance: node.distance,
-              elevation: elevations ? elevations[idx] : getFallbackAlt(node.coord[0], node.coord[1], node.frac)
-            }));
-
-            const shortLabel = (str, fallbackCoord) => {
-              if (!str || !str.trim()) return `(${fallbackCoord[0].toFixed(3)}, ${fallbackCoord[1].toFixed(3)})`;
-              return str.split(',')[0].trim();
-            };
-
-            const shortOrigen = shortLabel(origen, resolvedOrigenCoords);
-            const shortDestino = shortLabel(destino, resolvedDestinoCoords);
-            const distKm = (totalDistMeters / 1000).toFixed(2);
-
-            const dynamicRoute = {
-              id: `osrm-calculated-route-${Date.now()}`,
-              name: `Ruta Óptima: ${shortOrigen} ➔ ${shortDestino} (${distKm} km)`,
-              subtitle: `Trazado ciclista real OSRM (${coords.length} nodos viales) • Altimetría Open-Meteo`,
-              category: 'Ruta Óptima',
-              surface: 'Ciclovía segregada / Vía urbana compartida',
-              difficulty: totalDistMeters > 12000 ? 'Exigente' : (totalDistMeters > 5000 ? 'Moderada' : 'Fácil'),
-              badgeColor: 'emerald',
-              center: [(lat1 + lat2) / 2, (lon1 + lon2) / 2],
-              zoom: totalDistMeters > 15000 ? 12 : (totalDistMeters > 7000 ? 13 : 14),
-              origen: origen || `Lat: ${lat1.toFixed(4)}, Lng: ${lon1.toFixed(4)}`,
-              destino: destino || `Lat: ${lat2.toFixed(4)}, Lng: ${lon2.toFixed(4)}`,
-              coordinates: coords,
-              points: points
-            };
-
-            setSelectedRoute(dynamicRoute);
-            setIsCalculating(false);
-            return;
-          }
-        }
-      } catch (osrmErr) {
-        console.warn('Error en cálculo OSRM dinámico:', osrmErr);
-      }
+    if (!resolvedOrigenCoords || !resolvedDestinoCoords) {
+      alert(`No fue posible geocodificar la ubicación ingresada (${!resolvedOrigenCoords ? 'Origen: ' + origen : 'Destino: ' + destino}). Por favor selecciona una sugerencia del autocompletado o especifica la comuna.`);
+      setIsCalculating(false);
+      return;
     }
 
-    // Fallback en caso de sin conexión externa
-    setTimeout(() => {
-      const match = PRESET_ROUTES[0];
-      setSelectedRoute({
-        ...match,
-        origen: origen || match.origen,
-        destino: destino || match.destino
+    const lat1 = resolvedOrigenCoords[0], lon1 = resolvedOrigenCoords[1];
+    const lat2 = resolvedDestinoCoords[0], lon2 = resolvedDestinoCoords[1];
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 9000);
+      const osrmUrl = `https://router.project-osrm.org/route/v1/bicycle/${lon1},${lat1};${lon2},${lat2}?overview=full&geometries=geojson`;
+      const response = await fetch(osrmUrl, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+          const routeData = data.routes[0];
+          const rawCoords = routeData.geometry.coordinates;
+          const coords = rawCoords.map(([lon, lat]) => [
+            parseFloat(lat.toFixed(5)),
+            parseFloat(lon.toFixed(5))
+          ]);
+
+          const haversine = (c1, c2) => {
+            const R = 6371e3;
+            const p1 = (c1[0] * Math.PI) / 180;
+            const p2 = (c2[0] * Math.PI) / 180;
+            const dp = ((c2[0] - c1[0]) * Math.PI) / 180;
+            const dl = ((c2[1] - c1[1]) * Math.PI) / 180;
+            const a = Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          };
+
+          const cumDist = [0];
+          for (let i = 1; i < coords.length; i++) {
+            cumDist.push(cumDist[i - 1] + haversine(coords[i - 1], coords[i]));
+          }
+          const totalDistMeters = Math.round(routeData.distance || cumDist[cumDist.length - 1]);
+
+          const getFallbackAlt = (lat, lng, progressFraction) => {
+            const isHill = lat > -33.435 && lat < -33.415 && lng > -70.645 && lng < -70.615;
+            if (isHill && progressFraction > 0.39) {
+              const hProg = (progressFraction - 0.39) / 0.61;
+              return Math.round(630 + hProg * 188);
+            }
+            const eastFactor = (-70.50 - lng) / (-70.50 - -70.75);
+            const northFactor = (-33.35 - lat) / (-33.35 - -33.55);
+            const baseElev = 520 + (1 - eastFactor) * 220 + (1 - northFactor) * 60;
+            return Math.round(baseElev + Math.sin(lat * 1200) * 6 + Math.cos(lng * 1200) * 6);
+          };
+
+          const numSamples = Math.min(40, Math.max(16, Math.floor(totalDistMeters / 250)));
+          const sampledNodes = [];
+          for (let s = 0; s <= numSamples; s++) {
+            const targetDist = (s / numSamples) * totalDistMeters;
+            let bestIdx = 0;
+            let minDiff = Infinity;
+            for (let i = 0; i < cumDist.length; i++) {
+              const diff = Math.abs(cumDist[i] - targetDist);
+              if (diff < minDiff) {
+                minDiff = diff;
+                bestIdx = i;
+              }
+            }
+            sampledNodes.push({
+              distance: Math.round(targetDist),
+              coord: coords[bestIdx],
+              frac: s / numSamples
+            });
+          }
+
+          // Consultar elevaciones reales a Open-Meteo Elevation API (SRTM/Copernicus DEM)
+          let elevations = null;
+          try {
+            const latsParam = sampledNodes.map(n => n.coord[0]).join(',');
+            const lonsParam = sampledNodes.map(n => n.coord[1]).join(',');
+            const elevRes = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${latsParam}&longitude=${lonsParam}`);
+            if (elevRes.ok) {
+              const elevData = await elevRes.json();
+              if (Array.isArray(elevData.elevation) && elevData.elevation.length === sampledNodes.length) {
+                const rawElevs = elevData.elevation.map(e => Number(e));
+                // Suavizado de media móvil ponderada en puntos intermedios para evitar dientes de sierra DEM
+                elevations = rawElevs.map((val, idx) => {
+                  if (idx === 0 || idx === rawElevs.length - 1) return Math.round(val);
+                  return Math.round(rawElevs[idx - 1] * 0.25 + val * 0.5 + rawElevs[idx + 1] * 0.25);
+                });
+              }
+            }
+          } catch (elevErr) {
+            console.warn('Open-Meteo Elevation fallback:', elevErr);
+          }
+
+          const points = sampledNodes.map((node, idx) => ({
+            distance: node.distance,
+            elevation: elevations ? elevations[idx] : getFallbackAlt(node.coord[0], node.coord[1], node.frac)
+          }));
+
+          const shortLabel = (str, fallbackCoord) => {
+            if (!str || !str.trim()) return `(${fallbackCoord[0].toFixed(3)}, ${fallbackCoord[1].toFixed(3)})`;
+            return str.split(',')[0].trim();
+          };
+
+          const shortOrigen = shortLabel(origen, resolvedOrigenCoords);
+          const shortDestino = shortLabel(destino, resolvedDestinoCoords);
+          const distKm = (totalDistMeters / 1000).toFixed(2);
+
+          const dynamicRoute = {
+            id: `calculated-route-${Date.now()}`,
+            name: `Ruta Óptima: ${shortOrigen} ➔ ${shortDestino} (${distKm} km)`,
+            subtitle: `Trazado ciclista real OSRM (${coords.length} nodos viales) • Altimetría Open-Meteo`,
+            category: 'Ruta Personalizada',
+            surface: 'Vía ciclable / Red vial urbana',
+            difficulty: totalDistMeters > 12000 ? 'Exigente' : (totalDistMeters > 5000 ? 'Moderada' : 'Fácil'),
+            badgeColor: 'emerald',
+            center: [(lat1 + lat2) / 2, (lon1 + lon2) / 2],
+            zoom: totalDistMeters > 15000 ? 12 : (totalDistMeters > 7000 ? 13 : 14),
+            origen: origen || `Lat: ${lat1.toFixed(4)}, Lng: ${lon1.toFixed(4)}`,
+            destino: destino || `Lat: ${lat2.toFixed(4)}, Lng: ${lon2.toFixed(4)}`,
+            coordinates: coords,
+            points: points
+          };
+
+          setSelectedRoute(dynamicRoute);
+          setIsCalculating(false);
+          return;
+        }
+      }
+    } catch (osrmErr) {
+      console.warn('Error en cálculo OSRM dinámico:', osrmErr);
+    }
+
+    // Fallback geométrico con las coordenadas exactas de origen y destino si el servidor OSRM no responde
+    const haversineDist = (c1, c2) => {
+      const R = 6371e3;
+      const p1 = (c1[0] * Math.PI) / 180, p2 = (c2[0] * Math.PI) / 180;
+      const dp = ((c2[0] - c1[0]) * Math.PI) / 180, dl = ((c2[1] - c1[1]) * Math.PI) / 180;
+      const a = Math.sin(dp / 2) ** 2 + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    };
+
+    const totalDistMeters = Math.max(500, Math.round(haversineDist([lat1, lon1], [lat2, lon2]) * 1.25));
+    const distKm = (totalDistMeters / 1000).toFixed(2);
+    const steps = 18;
+    const fallbackCoords = [];
+    const fallbackPoints = [];
+
+    for (let i = 0; i <= steps; i++) {
+      const frac = i / steps;
+      const curLat = lat1 + (lat2 - lat1) * frac;
+      const curLon = lon1 + (lon2 - lon1) * frac;
+      fallbackCoords.push([parseFloat(curLat.toFixed(5)), parseFloat(curLon.toFixed(5))]);
+      fallbackPoints.push({
+        distance: Math.round(totalDistMeters * frac),
+        elevation: Math.round(560 + frac * 80 + Math.sin(frac * Math.PI) * 20)
       });
-      setIsCalculating(false);
-    }, 400);
+    }
+
+    const shortLabel = (str, fallbackCoord) => {
+      if (!str || !str.trim()) return `(${fallbackCoord[0].toFixed(3)}, ${fallbackCoord[1].toFixed(3)})`;
+      return str.split(',')[0].trim();
+    };
+
+    const shortOrigen = shortLabel(origen, resolvedOrigenCoords);
+    const shortDestino = shortLabel(destino, resolvedDestinoCoords);
+
+    const fallbackRoute = {
+      id: `calculated-route-${Date.now()}`,
+      name: `Ruta Óptima: ${shortOrigen} ➔ ${shortDestino} (${distKm} km)`,
+      subtitle: `Trazado interpolado directo (${fallbackCoords.length} nodos)`,
+      category: 'Ruta Personalizada',
+      surface: 'Red vial urbana',
+      difficulty: totalDistMeters > 10000 ? 'Exigente' : 'Moderada',
+      badgeColor: 'emerald',
+      center: [(lat1 + lat2) / 2, (lon1 + lon2) / 2],
+      zoom: totalDistMeters > 15000 ? 12 : 14,
+      origen: origen || `${lat1.toFixed(4)}, ${lon1.toFixed(4)}`,
+      destino: destino || `${lat2.toFixed(4)}, ${lon2.toFixed(4)}`,
+      coordinates: fallbackCoords,
+      points: fallbackPoints
+    };
+
+    setSelectedRoute(fallbackRoute);
+    setIsCalculating(false);
   };
 
   // Manejador de guardado de perfil biométrico (persiste en MongoDB vía POST /api/profile)

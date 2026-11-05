@@ -10,6 +10,12 @@ El formato de versión utilizado es:
 
 ---
 
+## [1.6.3] - 2026-11-04
+### Fixed
+- **Cálculo Dinámico de Rutas Óptimas**: Corrección del comportamiento de "Calcular Ruta Óptima" para que calcule e interpola la ruta ciclista exacta entre los campos "Dirección Origen" y "Dirección Destino" (mediante OSRM y Open-Meteo Elevation), eliminando el desvío/secuestro hardcodeado que retornaba la ruta predefinida `Antonio Varas ➔ Cerro San Cristóbal` al buscar direcciones similares o por fallos de georreferenciación.
+
+---
+
 ## [1.6.2] - 2026-11-04
 ### Changed
 - **Versionamiento Semántico Centralizado**: Corrección del identificador de versión en la interfaz web (de la etiqueta estática `WEB V1.0` al identificador dinámico `v1.6.2`).
