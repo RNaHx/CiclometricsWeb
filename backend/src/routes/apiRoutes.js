@@ -19,6 +19,19 @@ router.get('/health', async (req, res) => {
   } catch (err) {
     console.warn('[Health] Aviso al inicializar store:', err.message);
   }
+  const resendKey = (
+    process.env.RESEND_API_KEY ||
+    process.env.RESEND_KEY ||
+    process.env.RESEND_TOKEN ||
+    process.env.RESEND_APIKEY
+  )?.trim();
+
+  let keyVariable = 'NONE';
+  if (process.env.RESEND_API_KEY) keyVariable = 'RESEND_API_KEY';
+  else if (process.env.RESEND_KEY) keyVariable = 'RESEND_KEY';
+  else if (process.env.RESEND_TOKEN) keyVariable = 'RESEND_TOKEN';
+  else if (process.env.RESEND_APIKEY) keyVariable = 'RESEND_APIKEY';
+
   res.json({
     status: 'ok',
     service: 'CicloMetrics Backend API',
@@ -26,7 +39,8 @@ router.get('/health', async (req, res) => {
     storage: defaultStore.getEngineInfo(),
     email: {
       provider: 'Resend',
-      apiKeyDetected: Boolean(process.env.RESEND_API_KEY),
+      apiKeyDetected: Boolean(resendKey),
+      keyVariable,
       fromEmail: process.env.RESEND_FROM_EMAIL || 'CicloMetrics <onboarding@resend.dev>'
     },
     timestamp: new Date().toISOString()

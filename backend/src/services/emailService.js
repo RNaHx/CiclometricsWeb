@@ -179,7 +179,12 @@ function buildPasswordResetEmailTemplate(code, expiresMinutes = 15) {
  * @returns {Promise<{ success: boolean, messageId?: string, fallback?: boolean }>}
  */
 async function sendPasswordResetEmail({ to, code, expiresMinutes = 15 }) {
-  const apiKey = process.env.RESEND_API_KEY;
+  const apiKey = (
+    process.env.RESEND_API_KEY ||
+    process.env.RESEND_KEY ||
+    process.env.RESEND_TOKEN ||
+    process.env.RESEND_APIKEY
+  )?.trim();
   const fromEmail = process.env.RESEND_FROM_EMAIL || 'CicloMetrics <onboarding@resend.dev>';
 
   console.log(`[Auth Mailer] Procesando envío de código ${code} para: ${to} | Remitente: ${fromEmail} | API Key detectada: ${Boolean(apiKey)}`);
