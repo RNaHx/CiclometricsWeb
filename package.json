@@ -1,6 +1,6 @@
 {
   "name": "ciclometrics-web",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "private": true,
   "description": "Plataforma de Planificación Inteligente de Rutas Ciclistas",
   "scripts": {
@@ -8,7 +8,9 @@
     "build": "npm run build --prefix frontend",
     "dev:frontend": "npm run dev --prefix frontend",
     "dev:backend": "npm run dev --prefix backend",
-    "test": "npm test --prefix backend"
+    "test": "npm test --prefix backend",
+    "docs:html": "node docs/generate_informe_seminario_unab.js && node docs/generate_informe_proyecto_unab.js",
+    "docs:docx": "node docs/export_to_word.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -16,5 +18,8 @@
     "express": "^4.21.2",
     "mongodb": "^7.8.0",
     "resend": "^6.37.0"
+  },
+  "devDependencies": {
+    "docx": "^9.15.3"
   }
 }

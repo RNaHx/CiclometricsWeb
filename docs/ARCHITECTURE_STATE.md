@@ -64,7 +64,7 @@ $$\text{kCal} = MET \times (M_{\text{usuario}} + M_{\text{bicicleta}}) \times \D
 ### B. Presión de Neumáticos (PSI) — Frank Berto (15% Drop) & Schwalbe (2022)
 - Distribución de carga: **40% rueda delantera**, **60% rueda trasera** del peso del sistema ($M_{\text{total}} = M_{\text{usuario}} + M_{\text{bicicleta}}$).
 - Factores por ancho de neumático ($mm$) y rodado.
-- **Invariante de seguridad**: La presión resultante **siempre** queda acotada dentro del rango $[\text{psi\_min}, \text{psi\_max}]$ de la cubierta.
+- **Invariante de seguridad**: La presión resultante **siempre** queda acotada dentro del rango $[\text{PSI}_{\min}, \text{PSI}_{\max}]$ de la cubierta.
 
 ### C. Mitigaciones Topográficas (RT-02 y RT-03)
 - **RT-02 (Interpolación Continua)**: Los vacíos o valores `NaN` devueltos por el proveedor DEM se interpolan linealmente entre puntos válidos adyacentes; los extremos se propagan por borde.

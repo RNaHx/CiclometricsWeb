@@ -33,3 +33,14 @@ Thumbs.db
 # Temp files
 *.tmp
 test_esri_dark.png
+
+# Informes académicos y scripts de exportación documental (mantener locales)
+docs/Henriquez_R_*
+docs/Proyecto_*
+docs/generate_*
+docs/export_*
+docs/*.html
+docs/*.docx
+docs/images/
+
+

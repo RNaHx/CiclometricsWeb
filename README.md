@@ -13,7 +13,7 @@
 
 - **🔥 Gasto Calórico Personalizado (kCal)**: Basado en el modelo de **Equivalentes Metabólicos (MET)** (*Ainsworth et al., 2011*) ponderado tramo a tramo según micro-variaciones de pendiente y el peso total del sistema ($M_{\text{ciclista}} + M_{\text{bicicleta}}$).
 - **⏱️ Tiempo Estimado de Llegada (ETA) Dinámico**: Adaptación continua de velocidad real de pedaleo según la pendiente del terreno.
-- **🚲 Presión Óptima de Neumáticos (PSI)**: Basado en la física de resistencia a la rodadura (*Schwalbe, 2022* / *Berto 15% drop rule*), con distribución de carga 40% delantera y 60% trasera acotada a límites de seguridad $[\text{psi\_min}, \text{psi\_max}]$.
+- **🚲 Presión Óptima de Neumáticos (PSI)**: Basado en la física de resistencia a la rodadura (*Schwalbe, 2022* / *Berto 15% drop rule*), con distribución de carga 40% delantera y 60% trasera acotada a límites de seguridad $[\text{PSI}_{\min}, \text{PSI}_{\max}]$.
 - **🗺️ Cartografía y Trazados Reales sin Marcas de Agua**:
   - **🚲 CyclOSM**: Cartografía ciclista oficial sobre OpenStreetMap con ciclovías segregadas, pendientes y curvas de nivel.
   - **🗺️ OpenStreetMap Estándar**: Callejero urbano nítido.
@@ -28,7 +28,7 @@
 
 ## 🏗️ Arquitectura Técnica
 
-- **Frontend**: React 18, Vite, Tailwind CSS v4, Leaflet / OpenStreetMap / CyclOSM, Lucide Icons.
+- **Frontend**: React 19, Vite, Tailwind CSS v4, Leaflet / OpenStreetMap / CyclOSM, Lucide Icons.
 - **Backend**: Node.js, Express.js, Persistencia JSON atómica con control de concurrencia y validación estricta de esquemas (Zod/Joi).
 - **Modelos Físicos & APIs**: Algoritmos propios de MET e interpolación altimétrica continua (*Mitigación RT-02* y *RT-03*), Open-Meteo Elevation API y OSRM Bicycle Router.
 - **Equipo de Agentes Autónomos**: Arquitectura modular en `.agents/agents/` coordinada por un **Orquestador** con subagentes especializados (`backend`, `frontend`, `qa`).

@@ -10,6 +10,16 @@ El formato de versión utilizado es:
 
 ---
 
+## [1.7.1] - 2026-11-10
+### Fixed
+- **Fórmulas Matemáticas en README**: Corrección de sintaxis KaTeX/LaTeX en [`README.md`](file:///c:/Users/ricar/OneDrive/Desktop/CiclometricsWeb/README.md) y [`docs/ARCHITECTURE_STATE.md`](file:///c:/Users/ricar/OneDrive/Desktop/CiclometricsWeb/docs/ARCHITECTURE_STATE.md) para el rango de presiones de inflado ($[\text{PSI}_{\min}, \text{PSI}_{\max}]$), eliminando el error de análisis de GitHub `'_' allowed only in math mode`.
+- **Limpieza de Repositorio Público**: Eliminación del seguimiento de Git de informes académicos y scripts generadores (`docs/Henriquez_R_*`, `docs/Proyecto_*`, `docs/generate_*`, `docs/export_*`, `.docx`, `.html`), preservándolos de forma segura en el almacenamiento local e ignorándolos en [`.gitignore`](file:///c:/Users/ricar/OneDrive/Desktop/CiclometricsWeb/.gitignore).
+
+### Added
+- **Suite de Pruebas de Cargabilidad y Concurrencia**: Incorporación de [`backend/tests/verifyLoadTesting.js`](file:///c:/Users/ricar/OneDrive/Desktop/CiclometricsWeb/backend/tests/verifyLoadTesting.js) para evaluación de latencias (p50, p95, p99), throughput y saturación bajo concurrencia.
+
+---
+
 ## [1.7.0] - 2026-11-04
 ### Added
 - **Recuperación Robusta de Contraseñas con Resend y Códigos OTP**:
