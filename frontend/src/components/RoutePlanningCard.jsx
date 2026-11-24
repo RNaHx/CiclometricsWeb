@@ -7,8 +7,10 @@ import {
   Sparkles, 
   Loader2,
   Compass,
-  X
+  X,
+  AlertTriangle
 } from 'lucide-react';
+import { isLocationOutsideRM, isCoordInRM } from '../utils/rmCoverage';
 
 // Catálogo instantáneo de hitos ciclistas y rutas frecuentes (Chile / RM)
 const LOCAL_LANDMARKS = [
@@ -131,6 +133,10 @@ function RoutePlanningCard({
   const [destinoLat, setDestinoLat] = useState('-33.4240');
   const [destinoLng, setDestinoLng] = useState('-70.6325');
 
+  // Indicadores preventivos de cobertura fuera de la Región Metropolitana
+  const [origenOutsideRM, setOrigenOutsideRM] = useState(false);
+  const [destinoOutsideRM, setDestinoOutsideRM] = useState(false);
+
   // Cerrar dropdowns al hacer clic fuera
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -148,13 +154,15 @@ function RoutePlanningCard({
   // Filtrar catálogo local instantáneo con preservación de número si coincide la calle
   const getLocalMatches = useCallback((query) => {
     const normQuery = normalizeText(query);
-    if (!normQuery) return LOCAL_LANDMARKS.slice(0, 6);
+    const list = !normQuery
+      ? LOCAL_LANDMARKS.slice(0, 6)
+      : LOCAL_LANDMARKS.filter((item) => {
+          const haystack = normalizeText(`${item.primary} ${item.secondary}`);
+          const tokens = normQuery.split(/\s+/).filter(Boolean);
+          return tokens.every((t) => haystack.includes(t)) || haystack.includes(normQuery);
+        });
 
-    const tokens = normQuery.split(/\s+/).filter(Boolean);
-    return LOCAL_LANDMARKS.filter((item) => {
-      const haystack = normalizeText(`${item.primary} ${item.secondary}`);
-      return tokens.every((t) => haystack.includes(t)) || haystack.includes(normQuery);
-    });
+    return list.map((item) => ({ ...item, isOutsideRM: false }));
   }, []);
 
   // Consulta híbrida: Catálogo instantáneo + Nominatim OpenStreetMap Chile
@@ -228,12 +236,15 @@ function RoutePlanningCard({
           parseFloat(parseFloat(item.lat).toFixed(5)),
           parseFloat(parseFloat(item.lon).toFixed(5))
         ];
+        const isOutsideRM = isLocationOutsideRM({ coords, address: addr });
 
         return {
           primary,
           secondary,
           fullLabel,
-          coords
+          coords,
+          isOutsideRM,
+          address: addr
         };
       });
 
@@ -292,6 +303,7 @@ function RoutePlanningCard({
   const handleSelectOrigen = (item) => {
     setOrigenDir(item.fullLabel);
     setOrigenSelectedCoords(item.coords);
+    setOrigenOutsideRM(Boolean(item.isOutsideRM));
     setIsOrigenOpen(false);
     setOrigenActiveIdx(-1);
   };
@@ -299,6 +311,7 @@ function RoutePlanningCard({
   const handleSelectDestino = (item) => {
     setDestinoDir(item.fullLabel);
     setDestinoSelectedCoords(item.coords);
+    setDestinoOutsideRM(Boolean(item.isOutsideRM));
     setIsDestinoOpen(false);
     setDestinoActiveIdx(-1);
   };
@@ -359,6 +372,8 @@ function RoutePlanningCard({
         destino: destinoDir.trim(),
         origenCoords: origenSelectedCoords,
         destinoCoords: destinoSelectedCoords,
+        origenOutsideRM,
+        destinoOutsideRM,
         bikeId: selectedBikeId
       });
     } else {
@@ -372,6 +387,29 @@ function RoutePlanningCard({
       });
     }
   };
+
+  const hasOutsideRMPreview = (() => {
+    if (activeTab === 'direcciones') {
+      return origenOutsideRM || destinoOutsideRM;
+    }
+    const oLat = parseFloat(origenLat);
+    const oLng = parseFloat(origenLng);
+    const dLat = parseFloat(destinoLat);
+    const dLng = parseFloat(destinoLng);
+    const origOut =
+      origenLat.trim() !== '' &&
+      origenLng.trim() !== '' &&
+      Number.isFinite(oLat) &&
+      Number.isFinite(oLng) &&
+      !isCoordInRM([oLat, oLng]);
+    const destOut =
+      destinoLat.trim() !== '' &&
+      destinoLng.trim() !== '' &&
+      Number.isFinite(dLat) &&
+      Number.isFinite(dLng) &&
+      !isCoordInRM([dLat, dLng]);
+    return origOut || destOut;
+  })();
 
   return (
     <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-lg transition-colors">
@@ -441,6 +479,7 @@ function RoutePlanningCard({
                   onChange={(e) => {
                     setOrigenDir(e.target.value);
                     setOrigenSelectedCoords(null);
+                    setOrigenOutsideRM(false);
                     setIsOrigenOpen(true);
                     setOrigenActiveIdx(-1);
                   }}
@@ -456,7 +495,8 @@ function RoutePlanningCard({
                     onClick={() => {
                       setOrigenDir('');
                       setOrigenSelectedCoords(null);
-                      setOrigenSuggestions(LOCAL_LANDMARKS.slice(0, 6));
+                      setOrigenOutsideRM(false);
+                      setOrigenSuggestions(LOCAL_LANDMARKS.slice(0, 6).map((item) => ({ ...item, isOutsideRM: false })));
                       setIsOrigenOpen(true);
                       setOrigenActiveIdx(-1);
                     }}
@@ -493,9 +533,9 @@ function RoutePlanningCard({
                         }`}
                       >
                         <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 text-slate-500 dark:text-slate-400">
-                          <MapPin className="w-3.5 h-3.5 text-emerald-500" />
+                          <MapPin className={`w-3.5 h-3.5 ${item.isOutsideRM ? 'text-amber-500' : 'text-emerald-500'}`} />
                         </div>
-                        <div className="truncate leading-snug">
+                        <div className="min-w-0 flex-1 truncate leading-snug">
                           <span className="font-semibold text-slate-800 dark:text-slate-100">
                             {item.primary}
                           </span>
@@ -505,6 +545,11 @@ function RoutePlanningCard({
                             </span>
                           )}
                         </div>
+                        {item.isOutsideRM && (
+                          <span className="ml-auto shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                            Fuera de RM
+                          </span>
+                        )}
                       </button>
                     );
                   })}
@@ -529,6 +574,7 @@ function RoutePlanningCard({
                   onChange={(e) => {
                     setDestinoDir(e.target.value);
                     setDestinoSelectedCoords(null);
+                    setDestinoOutsideRM(false);
                     setIsDestinoOpen(true);
                     setDestinoActiveIdx(-1);
                   }}
@@ -544,7 +590,8 @@ function RoutePlanningCard({
                     onClick={() => {
                       setDestinoDir('');
                       setDestinoSelectedCoords(null);
-                      setDestinoSuggestions(LOCAL_LANDMARKS.slice(0, 6));
+                      setDestinoOutsideRM(false);
+                      setDestinoSuggestions(LOCAL_LANDMARKS.slice(0, 6).map((item) => ({ ...item, isOutsideRM: false })));
                       setIsDestinoOpen(true);
                       setDestinoActiveIdx(-1);
                     }}
@@ -581,9 +628,9 @@ function RoutePlanningCard({
                         }`}
                       >
                         <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 text-slate-500 dark:text-slate-400">
-                          <MapPin className="w-3.5 h-3.5 text-rose-500" />
+                          <MapPin className={`w-3.5 h-3.5 ${item.isOutsideRM ? 'text-amber-500' : 'text-rose-500'}`} />
                         </div>
-                        <div className="truncate leading-snug">
+                        <div className="min-w-0 flex-1 truncate leading-snug">
                           <span className="font-semibold text-slate-800 dark:text-slate-100">
                             {item.primary}
                           </span>
@@ -593,6 +640,11 @@ function RoutePlanningCard({
                             </span>
                           )}
                         </div>
+                        {item.isOutsideRM && (
+                          <span className="ml-auto shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                            Fuera de RM
+                          </span>
+                        )}
                       </button>
                     );
                   })}
@@ -696,6 +748,19 @@ function RoutePlanningCard({
             </select>
           </div>
         </div>
+
+        {/* Alerta preventiva si el origen o destino seleccionado está fuera de la RM */}
+        {hasOutsideRMPreview && (
+          <div
+            role="status"
+            className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-[11px] text-amber-800 dark:text-amber-200 flex items-start gap-2 leading-relaxed"
+          >
+            <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+            <span>
+              <strong className="font-bold">Ubicación fuera de la Región Metropolitana:</strong> el proyecto está limitado a su uso en la RM, por lo que no podemos garantizar que las rutas fuera de ella estén total y correctamente mapeadas.
+            </span>
+          </div>
+        )}
 
         {/* Botón verde esmeralda: [Calcular Ruta Óptima] */}
         <button

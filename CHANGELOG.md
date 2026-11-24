@@ -10,6 +10,12 @@ El formato de versión utilizado es:
 
 ---
 
+## [1.8.0] - 2026-11-24
+### Added
+- **Alerta de Cobertura Geográfica (Región Metropolitana)**: Incorporación de [`frontend/src/utils/rmCoverage.js`](file:///c:/Users/ricar/OneDrive/Desktop/CiclometricsWeb/frontend/src/utils/rmCoverage.js) para detectar ubicaciones fuera de la RM mediante metadatos administrativos (Nominatim/Photon) y polígono geográfico, desplegando etiqueta y aviso preventivo en [`RoutePlanningCard.jsx`](file:///c:/Users/ricar/OneDrive/Desktop/CiclometricsWeb/frontend/src/components/RoutePlanningCard.jsx) junto a un modal de alerta (`role="alertdialog"`) y banner persistente en [`App.jsx`](file:///c:/Users/ricar/OneDrive/Desktop/CiclometricsWeb/frontend/src/App.jsx).
+
+---
+
 ## [1.7.2] - 2026-11-24
 ### Fixed
 - **Cambio de capa cartográfica en modo oscuro**: El mapa base quedaba en negro al cambiar entre capas (`Ciclista / Topo` / `Calles` ↔ `Satélite`) porque React sobrescribía las clases internas de `.leaflet-container` al alternar `dark-map-tiles` directamente sobre `mapContainerRef`; se movió la clase dinámica a un wrapper contenedor y se añadió `invalidateSize()` tras el cambio de capa.
