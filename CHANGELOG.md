@@ -10,6 +10,12 @@ El formato de versión utilizado es:
 
 ---
 
+## [1.7.2] - 2026-11-24
+### Fixed
+- **Cambio de capa cartográfica en modo oscuro**: El mapa base quedaba en negro al cambiar entre capas (`Ciclista / Topo` / `Calles` ↔ `Satélite`) porque React sobrescribía las clases internas de `.leaflet-container` al alternar `dark-map-tiles` directamente sobre `mapContainerRef`; se movió la clase dinámica a un wrapper contenedor y se añadió `invalidateSize()` tras el cambio de capa.
+
+---
+
 ## [1.7.1] - 2026-11-10
 ### Fixed
 - **Fórmulas Matemáticas en README**: Corrección de sintaxis KaTeX/LaTeX en [`README.md`](file:///c:/Users/ricar/OneDrive/Desktop/CiclometricsWeb/README.md) y [`docs/ARCHITECTURE_STATE.md`](file:///c:/Users/ricar/OneDrive/Desktop/CiclometricsWeb/docs/ARCHITECTURE_STATE.md) para el rango de presiones de inflado ($[\text{PSI}_{\min}, \text{PSI}_{\max}]$), eliminando el error de análisis de GitHub `'_' allowed only in math mode`.

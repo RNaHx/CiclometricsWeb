@@ -180,6 +180,13 @@ function InteractiveMap({
       }).addTo(map);
 
       map._tileLayer = newTileLayer;
+      setTimeout(() => {
+        try {
+          mapInstanceRef.current?.invalidateSize();
+        } catch (e) {
+          // Ignorar si el mapa fue desmontado
+        }
+      }, 50);
     } catch (err) {
       console.warn('Error al cambiar capa en mapa Leaflet:', err);
     }
@@ -721,11 +728,11 @@ function InteractiveMap({
         </div>
       )}
 
-      {/* Contenedor del Mapa Leaflet (con filtro Dark Mode solo si no es Satélite) */}
-      <div 
-        ref={mapContainerRef} 
-        className={`w-full h-full relative transform-gpu ${shouldApplyDarkTilesFilter ? 'dark-map-tiles' : ''}`} 
-      />
+      {/* Wrapper con filtro Dark Mode: la clase dinámica NUNCA va en el contenedor de Leaflet,
+          porque React sobrescribiría las clases internas (leaflet-container, etc.) */}
+      <div className={`absolute inset-0 ${shouldApplyDarkTilesFilter ? 'dark-map-tiles' : ''}`}>
+        <div ref={mapContainerRef} className="w-full h-full" />
+      </div>
 
       {/* Banner Informativo Inferior Flotante de la Ruta Activa */}
       {!isCleanView && selectedRoute && (
