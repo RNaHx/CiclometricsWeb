@@ -11,7 +11,8 @@ import CookieConsentBanner from './components/CookieConsentBanner';
 import apiService from './services/api';
 import { PRESET_ROUTES } from './data/presetRoutes';
 import OPTIMAL_ROUTE_VARAS_CRISTOBAL from './data/optimalRouteVarasCristobal.json';
-import { SlidersHorizontal, Zap, RotateCcw, MapPin, Compass } from 'lucide-react';
+import { SlidersHorizontal, Zap, RotateCcw, MapPin, Compass, AlertTriangle, X } from 'lucide-react';
+import { evaluateRouteRMCoverage } from './utils/rmCoverage';
 
 const CockpitView = React.lazy(() => import('./components/CockpitView'));
 const AuthModal = React.lazy(() => import('./components/AuthModal'));
@@ -181,6 +182,18 @@ export default function App() {
   // 6. RUTA ACTIVA (Inicialmente null para reflejar el estado vacío de la Imagen 3)
   const [selectedRoute, setSelectedRoute] = useState(null);
   const [hoverCoordinate, setHoverCoordinate] = useState(null);
+  const [rmCoverageAlert, setRmCoverageAlert] = useState(null);
+
+  useEffect(() => {
+    if (!rmCoverageAlert?.showModal) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setRmCoverageAlert((prev) => (prev ? { ...prev, showModal: false } : null));
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [rmCoverageAlert?.showModal]);
 
   // 7. RESULTADOS DE CÁLCULO PREDICTIVO Y CACHÉ EN MEMORIA
   const [calculationData, setCalculationData] = useState(null);
@@ -350,39 +363,43 @@ export default function App() {
     // 1. Coordenadas directas escritas como "-33.4349, -70.6151"
     const coordMatch = text.match(/^(-?\d+(?:\.\d+)?)\s*[,;\s]\s*(-?\d+(?:\.\d+)?)$/);
     if (coordMatch) {
-      return [parseFloat(coordMatch[1]), parseFloat(coordMatch[2])];
+      return {
+        coords: [parseFloat(coordMatch[1]), parseFloat(coordMatch[2])],
+        address: null,
+        isPresetRM: false
+      };
     }
 
     // 2. Hitos ciclistas y puntos emblemáticos de Santiago / RM (evita ambigüedad con calles homónimas)
     if (norm.includes('cerro san cristobal') || norm.includes('cumbre san cristobal') || norm.includes('parque metropolitano')) {
-      return [-33.42401, -70.63262];
+      return { coords: [-33.42401, -70.63262], address: null, isPresetRM: true };
     }
     if (norm.includes('antonio varas') && (norm.includes('810') || !/\d/.test(norm))) {
-      return [-33.4349, -70.61513];
+      return { coords: [-33.4349, -70.61513], address: null, isPresetRM: true };
     }
     if (norm.includes('cuesta la dormida')) {
-      return [-33.0560, -71.0080];
+      return { coords: [-33.0560, -71.0080], address: null, isPresetRM: true };
     }
     if (norm.includes('templo bahai') || norm.includes('bahai')) {
-      return [-33.4764, -70.5117];
+      return { coords: [-33.4764, -70.5117], address: null, isPresetRM: true };
     }
     if (norm.includes('farellones')) {
-      return [-33.3508, -70.3129];
+      return { coords: [-33.3508, -70.3129], address: null, isPresetRM: true };
     }
     if (norm.includes('valle nevado')) {
-      return [-33.3547, -70.2494];
+      return { coords: [-33.3547, -70.2494], address: null, isPresetRM: true };
     }
     if (norm.includes('parque bicentenario') && !/\d/.test(norm)) {
-      return [-33.4015, -70.6020];
+      return { coords: [-33.4015, -70.6020], address: null, isPresetRM: true };
     }
     if (norm.includes('costanera center') || norm.includes('tobalaba')) {
-      if (!/\d/.test(norm)) return [-33.4177, -70.6068];
+      if (!/\d/.test(norm)) return { coords: [-33.4177, -70.6068], address: null, isPresetRM: true };
     }
     if (norm.includes('plaza de armas') && !/\d/.test(norm)) {
-      return [-33.4378, -70.6505];
+      return { coords: [-33.4378, -70.6505], address: null, isPresetRM: true };
     }
     if (norm.includes('plaza baquedano') || norm.includes('plaza italia')) {
-      return [-33.4370, -70.6344];
+      return { coords: [-33.4370, -70.6344], address: null, isPresetRM: true };
     }
 
     // 3. Consulta Nominatim OpenStreetMap (con variantes de búsqueda en Chile)
@@ -396,14 +413,18 @@ export default function App() {
 
     for (const q of queries) {
       try {
-        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=cl&limit=1`;
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=cl&addressdetails=1&limit=1`;
         const res = await fetch(url, {
           headers: { 'Accept-Language': 'es' }
         });
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data) && data.length > 0 && data[0].lat && data[0].lon) {
-            return [parseFloat(parseFloat(data[0].lat).toFixed(5)), parseFloat(parseFloat(data[0].lon).toFixed(5))];
+            return {
+              coords: [parseFloat(parseFloat(data[0].lat).toFixed(5)), parseFloat(parseFloat(data[0].lon).toFixed(5))],
+              address: data[0].address || null,
+              isPresetRM: false
+            };
           }
         }
       } catch (err) {
@@ -419,7 +440,11 @@ export default function App() {
         const data = await res.json();
         const coords = data?.features?.[0]?.geometry?.coordinates;
         if (Array.isArray(coords) && coords.length >= 2) {
-          return [parseFloat(coords[1].toFixed(5)), parseFloat(coords[0].toFixed(5))];
+          return {
+            coords: [parseFloat(coords[1].toFixed(5)), parseFloat(coords[0].toFixed(5))],
+            address: data?.features?.[0]?.properties || null,
+            isPresetRM: false
+          };
         }
       }
     } catch (err) {
@@ -456,7 +481,7 @@ export default function App() {
     };
     for (const [comuna, cCoords] of Object.entries(comunasRM)) {
       if (norm.includes(comuna)) {
-        return cCoords;
+        return { coords: cCoords, address: null, isPresetRM: true };
       }
     }
 
@@ -464,26 +489,57 @@ export default function App() {
   };
 
   // Manejador del botón [Calcular Ruta Óptima]
-  const handleCalculateRoutePlan = async ({ type, origen, destino, origenCoords, destinoCoords }) => {
+  const handleCalculateRoutePlan = async ({
+    type,
+    origen,
+    destino,
+    origenCoords,
+    destinoCoords,
+    origenOutsideRM = false,
+    destinoOutsideRM = false
+  }) => {
     setIsCalculating(true);
 
     // Resolver coordenadas de origen y destino (ya sea desde autocompletado, direcciones geocodificadas o coordenadas directas)
-    let resolvedOrigenCoords = origenCoords;
-    let resolvedDestinoCoords = destinoCoords;
+    let origMeta = origenCoords ? { coords: origenCoords, address: null, isPresetRM: false } : null;
+    let destMeta = destinoCoords ? { coords: destinoCoords, address: null, isPresetRM: false } : null;
 
     if (type === 'direcciones') {
       const [geoOrig, geoDest] = await Promise.all([
-        resolvedOrigenCoords ? Promise.resolve(resolvedOrigenCoords) : geocodeAddress(origen),
-        resolvedDestinoCoords ? Promise.resolve(resolvedDestinoCoords) : geocodeAddress(destino)
+        origMeta ? Promise.resolve(origMeta) : geocodeAddress(origen),
+        destMeta ? Promise.resolve(destMeta) : geocodeAddress(destino)
       ]);
-      resolvedOrigenCoords = geoOrig;
-      resolvedDestinoCoords = geoDest;
+      origMeta = geoOrig;
+      destMeta = geoDest;
     }
+
+    const resolvedOrigenCoords = origMeta?.coords;
+    const resolvedDestinoCoords = destMeta?.coords;
 
     if (!resolvedOrigenCoords || !resolvedDestinoCoords) {
       alert(`No fue posible geocodificar la ubicación ingresada (${!resolvedOrigenCoords ? 'Origen: ' + origen : 'Destino: ' + destino}). Por favor selecciona una sugerencia del autocompletado o especifica la comuna.`);
       setIsCalculating(false);
       return;
+    }
+
+    const coverage = evaluateRouteRMCoverage({
+      origenLabel: origen || `Lat: ${resolvedOrigenCoords[0]}, Lng: ${resolvedOrigenCoords[1]}`,
+      destinoLabel: destino || `Lat: ${resolvedDestinoCoords[0]}, Lng: ${resolvedDestinoCoords[1]}`,
+      origenCoords: resolvedOrigenCoords,
+      destinoCoords: resolvedDestinoCoords,
+      origenAddress: origMeta?.address,
+      destinoAddress: destMeta?.address,
+      origenForceOutside: Boolean(origenOutsideRM),
+      destinoForceOutside: Boolean(destinoOutsideRM),
+      origenPresetRM: Boolean(origMeta?.isPresetRM),
+      destinoPresetRM: Boolean(destMeta?.isPresetRM),
+      isPreset: Boolean(origMeta?.isPresetRM && destMeta?.isPresetRM)
+    });
+
+    if (coverage.isOutsideRM) {
+      setRmCoverageAlert({ outsidePoints: coverage.outsidePoints, showModal: true });
+    } else {
+      setRmCoverageAlert(null);
     }
 
     const lat1 = resolvedOrigenCoords[0], lon1 = resolvedOrigenCoords[1];
@@ -727,15 +783,33 @@ export default function App() {
     setCookieConsent(null);
     setSelectedRoute(null);
     setCalculationData(null);
+    setRmCoverageAlert(null);
     setBicycles([]);
     setSelectedBikeId(null);
   }, []);
 
   const handleSelectRoute = useCallback((route) => {
+    setRmCoverageAlert(null);
     setSelectedRoute(route);
   }, []);
 
   const handleSetCustomRoute = useCallback((custom) => {
+    const coords = custom?.coordinates || [];
+    if (coords.length > 0) {
+      const coverage = evaluateRouteRMCoverage({
+        origenLabel: custom.origen,
+        destinoLabel: custom.destino,
+        origenCoords: coords[0],
+        destinoCoords: coords[coords.length - 1]
+      });
+      if (coverage.isOutsideRM) {
+        setRmCoverageAlert({ outsidePoints: coverage.outsidePoints, showModal: true });
+      } else {
+        setRmCoverageAlert(null);
+      }
+    } else {
+      setRmCoverageAlert(null);
+    }
     setSelectedRoute(custom);
   }, []);
 
@@ -781,6 +855,7 @@ export default function App() {
   }, []);
 
   const handleClearRoute = useCallback(() => {
+    setRmCoverageAlert(null);
     setSelectedRoute(null);
     setCalculationData(null);
   }, []);
@@ -892,6 +967,42 @@ export default function App() {
               ======================================================== */}
           <section className="lg:col-span-8 space-y-6">
             
+            {/* Banner persistente de advertencia fuera de la Región Metropolitana */}
+            {rmCoverageAlert && (
+              <div
+                role="alert"
+                className="rounded-2xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-xs text-amber-900 dark:text-amber-100 flex items-start justify-between gap-3 shadow-sm"
+              >
+                <div className="flex items-start gap-2.5">
+                  <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="font-bold text-amber-800 dark:text-amber-300">
+                      Cobertura limitada a la Región Metropolitana
+                    </p>
+                    <p className="text-[11px] leading-relaxed text-amber-800/90 dark:text-amber-200/90">
+                      CicloMetrics Web está limitado a su uso en la RM. No podemos garantizar que las rutas fuera de ella estén total y correctamente mapeadas.
+                      {rmCoverageAlert.outsidePoints?.length > 0 && (
+                        <span className="block mt-1 font-medium">
+                          Ubicación detectada fuera de RM:{' '}
+                          {rmCoverageAlert.outsidePoints
+                            .map((pt) => `${pt.role}: ${pt.label}`)
+                            .join(' • ')}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setRmCoverageAlert(null)}
+                  aria-label="Cerrar alerta de cobertura fuera de RM"
+                  className="p-1 rounded-lg text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 transition-colors shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
             {/* Barra de estado superior y 4 tarjetas KPI (Imagen 5 y 6) */}
             <MetricsHeaderBar
               hasRoute={!!selectedRoute}
@@ -1047,6 +1158,64 @@ export default function App() {
           />
         )}
       </Suspense>
+
+      {/* MODAL DE ALERTA: BÚSQUEDA FUERA DE LA REGIÓN METROPOLITANA */}
+      {rmCoverageAlert?.showModal && (
+        <div
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="rm-alert-title"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm"
+        >
+          <div className="w-full max-w-md rounded-2xl border border-amber-500/40 bg-white dark:bg-slate-900 p-6 shadow-2xl space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5 text-amber-500" />
+              </div>
+              <div className="space-y-1">
+                <h2
+                  id="rm-alert-title"
+                  className="text-base font-bold text-slate-900 dark:text-white leading-snug"
+                >
+                  Alerta de Cobertura — Fuera de la Región Metropolitana
+                </h2>
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  CicloMetrics Web se encuentra limitado para su uso dentro de la Región Metropolitana de Santiago. Debido a esto, no podemos garantizar que las rutas, ciclovías y datos altimétricos fuera de la RM estén total y correctamente mapeados.
+                </p>
+              </div>
+            </div>
+
+            {rmCoverageAlert.outsidePoints?.length > 0 && (
+              <ul className="rounded-xl bg-amber-500/10 border border-amber-500/30 px-3.5 py-2.5 text-xs text-amber-900 dark:text-amber-100 space-y-1">
+                {rmCoverageAlert.outsidePoints.map((pt, idx) => (
+                  <li key={`${pt.role}-${idx}`} className="truncate">
+                    <strong className="font-semibold">{pt.role}:</strong> {pt.label}
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={handleClearRoute}
+                className="px-4 py-2 rounded-xl text-xs font-semibold border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                Cancelar búsqueda
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setRmCoverageAlert((prev) => (prev ? { ...prev, showModal: false } : null))
+                }
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-md shadow-amber-500/20 transition-colors"
+              >
+                Entendido, continuar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

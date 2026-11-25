@@ -37,7 +37,7 @@ router.get('/health', async (req, res) => {
   res.json({
     status: 'ok',
     service: 'CicloMetrics Backend API',
-    version: '1.7.2',
+    version: '1.8.0',
     storage: defaultStore.getEngineInfo(),
     email: {
       provider: 'Resend',
