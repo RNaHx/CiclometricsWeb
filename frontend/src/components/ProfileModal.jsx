@@ -22,8 +22,6 @@ export default function ProfileModal({
   onSaveProfile,
   isSaving
 }) {
-  if (!isOpen) return null;
-
   // Estado local para edición
   const [formData, setFormData] = useState({
     userId: profile?.userId || profile?.user?.id || null,
@@ -52,6 +50,8 @@ export default function ProfileModal({
   });
 
   const [saveSuccessMessage, setSaveSuccessMessage] = useState(null);
+
+  if (!isOpen) return null;
 
   // Selector rápido de plantilla de bicicleta
   const handleApplyBikePreset = (presetKey) => {

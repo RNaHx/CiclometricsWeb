@@ -28,10 +28,40 @@ export const MAP_LAYERS = {
     shortName: 'Ciclista',
     icon: '🚲',
     description: 'Ciclovías, vías ciclables y curvas de nivel (CyclOSM)',
+    providerName: 'CyclOSM',
     url: 'https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Tiles by <a href="https://www.cyclosm.org">CyclOSM</a>',
     subdomains: 'abc',
-    maxZoom: 18
+    maxZoom: 18,
+    fallbacks: [
+      {
+        providerName: 'Esri Topo + Rutas Ciclistas',
+        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
+        attribution: '&copy; <a href="https://www.esri.com">Esri</a> | Rutas ciclistas &copy; <a href="https://cycling.waymarkedtrails.org">Waymarked Trails</a> (<a href="https://www.openstreetmap.org/copyright">OSM</a>)',
+        subdomains: '',
+        maxZoom: 19,
+        overlay: {
+          url: 'https://tile.waymarkedtrails.org/cycling/{z}/{x}/{y}.png',
+          maxZoom: 18,
+          opacity: 0.85
+        }
+      },
+      {
+        providerName: 'OpenTopoMap',
+        url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+        attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, SRTM | Style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a>',
+        subdomains: 'abc',
+        maxNativeZoom: 17,
+        maxZoom: 19
+      },
+      {
+        providerName: 'OpenStreetMap',
+        url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        subdomains: '',
+        maxZoom: 19
+      }
+    ]
   },
   osm: {
     id: 'osm',
@@ -39,10 +69,20 @@ export const MAP_LAYERS = {
     shortName: 'Calles',
     icon: '🗺️',
     description: 'Cartografía vial estándar OpenStreetMap',
-    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    providerName: 'OpenStreetMap',
+    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    subdomains: 'abc',
-    maxZoom: 19
+    subdomains: '',
+    maxZoom: 19,
+    fallbacks: [
+      {
+        providerName: 'Esri World Street Map',
+        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+        attribution: '&copy; <a href="https://www.esri.com">Esri</a>, HERE, Garmin, OpenStreetMap contributors',
+        subdomains: '',
+        maxZoom: 19
+      }
+    ]
   },
   satellite: {
     id: 'satellite',
@@ -50,12 +90,37 @@ export const MAP_LAYERS = {
     shortName: 'Satélite',
     icon: '🛰️',
     description: 'Fotografía satelital Esri World Imagery',
+    providerName: 'Esri World Imagery',
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     attribution: '&copy; <a href="https://www.esri.com">Esri</a>, Maxar, Earthstar Geographics',
     subdomains: '',
-    maxZoom: 19
+    maxZoom: 19,
+    fallbacks: [
+      {
+        providerName: 'Esri World Topo Map',
+        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
+        attribution: '&copy; <a href="https://www.esri.com">Esri</a>, HERE, Garmin, OpenStreetMap contributors',
+        subdomains: '',
+        maxZoom: 19
+      }
+    ]
   }
 };
+
+// Caché temporal de disponibilidad de servidores de teselas para evitar reintentos repetidos en la misma sesión
+const failedTileSourceTimestamps = new Map();
+const SOURCE_COOLDOWN_MS = 5 * 60 * 1000;
+const TILE_LOAD_TIMEOUT_MS = 3500;
+
+function isSourceInCooldown(url) {
+  const failedAt = failedTileSourceTimestamps.get(url);
+  if (!failedAt) return false;
+  if (Date.now() - failedAt >= SOURCE_COOLDOWN_MS) {
+    failedTileSourceTimestamps.delete(url);
+    return false;
+  }
+  return true;
+}
 
 function InteractiveMap({
   selectedRoute,
@@ -78,11 +143,13 @@ function InteractiveMap({
   const [activeLayer, setActiveLayer] = useState('cyclosm');
   const [isLayerMenuOpen, setIsLayerMenuOpen] = useState(false);
 
-  // Estados para creación de ruta personalizada
+  // Estados para creación de ruta personalizada y estado de teselas
   const [isCustomMode, setIsCustomMode] = useState(false);
   const [customMarkers, setCustomMarkers] = useState([]);
   const [isRouting, setIsRouting] = useState(false);
   const [routingNotice, setRoutingNotice] = useState(null);
+  const [tileFallbackNotice, setTileFallbackNotice] = useState(null);
+  const fallbackNoticeTimerRef = useRef(null);
 
   // Cerrar menú de capas al hacer clic fuera
   useEffect(() => {
@@ -118,18 +185,12 @@ function InteractiveMap({
 
         L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-        // Tile layer inicial (CyclOSM por defecto)
-        const layerConfig = MAP_LAYERS.cyclosm;
-        const tileLayer = L.tileLayer(layerConfig.url, {
-          attribution: layerConfig.attribution,
-          subdomains: layerConfig.subdomains || 'abc',
-          maxZoom: layerConfig.maxZoom || 18,
-          keepBuffer: 3,
-          updateWhenIdle: true
-        }).addTo(map);
+        // Pane dedicado para overlay de rutas ciclistas (Waymarked Trails) sobre la capa base y bajo la ruta trazada
+        const cyclingPane = map.createPane('cyclingOverlayPane');
+        cyclingPane.style.zIndex = '250';
+        cyclingPane.style.pointerEvents = 'none';
 
         mapInstanceRef.current = map;
-        mapInstanceRef.current._tileLayer = tileLayer;
 
         const layerGroup = L.layerGroup().addTo(map);
         layerGroupRef.current = layerGroup;
@@ -148,6 +209,10 @@ function InteractiveMap({
     }
 
     return () => {
+      if (fallbackNoticeTimerRef.current) {
+        clearTimeout(fallbackNoticeTimerRef.current);
+        fallbackNoticeTimerRef.current = null;
+      }
       if (mapInstanceRef.current) {
         try {
           mapInstanceRef.current.remove();
@@ -159,37 +224,188 @@ function InteractiveMap({
     };
   }, []);
 
-  // 2. Cambio dinámico de proveedor de capa (CyclOSM, OSM, Satélite)
+  // 2. Gestión resiliente de proveedor de capa (CyclOSM, OSM, Satélite) con failover automático
   useEffect(() => {
     if (!mapInstanceRef.current) return;
-    try {
-      const map = mapInstanceRef.current;
-      const layerConfig = MAP_LAYERS[activeLayer];
-      if (!layerConfig) return;
+    const map = mapInstanceRef.current;
+    const layerConfig = MAP_LAYERS[activeLayer];
+    if (!layerConfig) return;
 
-      if (map._tileLayer) {
-        map.removeLayer(map._tileLayer);
+    const primarySource = {
+      providerName: layerConfig.providerName || layerConfig.name,
+      url: layerConfig.url,
+      attribution: layerConfig.attribution,
+      subdomains: layerConfig.subdomains,
+      maxZoom: layerConfig.maxZoom,
+      maxNativeZoom: layerConfig.maxNativeZoom
+    };
+    const candidates = [primarySource, ...(layerConfig.fallbacks || [])];
+
+    let cancelled = false;
+    let watchdogTimer = null;
+    let invalidateTimer = null;
+    let activeCleanup = null;
+
+    const clearTimersAndListeners = () => {
+      if (watchdogTimer) {
+        clearTimeout(watchdogTimer);
+        watchdogTimer = null;
       }
+      if (invalidateTimer) {
+        clearTimeout(invalidateTimer);
+        invalidateTimer = null;
+      }
+      if (activeCleanup) {
+        activeCleanup();
+        activeCleanup = null;
+      }
+    };
 
-      const newTileLayer = L.tileLayer(layerConfig.url, {
-        attribution: layerConfig.attribution,
-        subdomains: layerConfig.subdomains || 'abc',
-        maxZoom: layerConfig.maxZoom || 19,
+    const removeCurrentTileLayers = () => {
+      if (map._tileLayer) {
+        try {
+          map.removeLayer(map._tileLayer);
+        } catch {
+          // Ignorar si ya fue removida
+        }
+        map._tileLayer = null;
+      }
+      if (map._overlayTileLayer) {
+        try {
+          map.removeLayer(map._overlayTileLayer);
+        } catch {
+          // Ignorar si ya fue removida
+        }
+        map._overlayTileLayer = null;
+      }
+    };
+
+    const mountCandidate = (idx) => {
+      if (cancelled || idx >= candidates.length || !mapInstanceRef.current) return;
+
+      clearTimersAndListeners();
+      removeCurrentTileLayers();
+
+      const source = candidates[idx];
+      const tileOptions = {
+        attribution: source.attribution,
+        maxZoom: source.maxZoom || 19,
         keepBuffer: 3,
         updateWhenIdle: true
-      }).addTo(map);
+      };
+      if (source.subdomains) {
+        tileOptions.subdomains = source.subdomains;
+      }
+      if (source.maxNativeZoom) {
+        tileOptions.maxNativeZoom = source.maxNativeZoom;
+      }
 
+      const newTileLayer = L.tileLayer(source.url, tileOptions);
+      let hasLoadedAnyTile = false;
+      let errorCount = 0;
+
+      const triggerFailover = () => {
+        if (cancelled || hasLoadedAnyTile) return;
+        failedTileSourceTimestamps.set(source.url, Date.now());
+        if (idx + 1 < candidates.length) {
+          console.warn(
+            `Proveedor cartográfico "${source.providerName}" sin respuesta; activando respaldo "${candidates[idx + 1].providerName}".`
+          );
+          mountCandidate(idx + 1);
+        }
+      };
+
+      const handleTileLoad = () => {
+        if (cancelled) return;
+        hasLoadedAnyTile = true;
+        failedTileSourceTimestamps.delete(source.url);
+        if (watchdogTimer) {
+          clearTimeout(watchdogTimer);
+          watchdogTimer = null;
+        }
+      };
+
+      const handleTileError = () => {
+        if (cancelled || hasLoadedAnyTile) return;
+        errorCount += 1;
+        if (errorCount >= 3 && idx + 1 < candidates.length) {
+          triggerFailover();
+        }
+      };
+
+      newTileLayer.on('tileload', handleTileLoad);
+      newTileLayer.on('tileerror', handleTileError);
+
+      activeCleanup = () => {
+        newTileLayer.off('tileload', handleTileLoad);
+        newTileLayer.off('tileerror', handleTileError);
+      };
+
+      newTileLayer.addTo(map);
       map._tileLayer = newTileLayer;
-      setTimeout(() => {
+
+      if (source.overlay?.url) {
         try {
-          mapInstanceRef.current?.invalidateSize();
-        } catch (e) {
+          const overlayLayer = L.tileLayer(source.overlay.url, {
+            pane: 'cyclingOverlayPane',
+            maxZoom: source.overlay.maxZoom || 18,
+            opacity: source.overlay.opacity ?? 0.85,
+            keepBuffer: 2,
+            updateWhenIdle: true
+          }).addTo(map);
+          map._overlayTileLayer = overlayLayer;
+        } catch {
+          // Ignorar errores del overlay para no afectar la capa base
+        }
+      }
+
+      if (fallbackNoticeTimerRef.current) {
+        clearTimeout(fallbackNoticeTimerRef.current);
+        fallbackNoticeTimerRef.current = null;
+      }
+      if (idx > 0) {
+        setTileFallbackNotice(
+          `Servidor ${primarySource.providerName} no disponible — usando mapa de respaldo (${source.providerName})`
+        );
+        fallbackNoticeTimerRef.current = setTimeout(() => {
+          setTileFallbackNotice(null);
+          fallbackNoticeTimerRef.current = null;
+        }, 5000);
+      } else {
+        setTileFallbackNotice(null);
+      }
+
+      if (idx + 1 < candidates.length) {
+        watchdogTimer = setTimeout(() => {
+          if (!hasLoadedAnyTile) {
+            triggerFailover();
+          }
+        }, TILE_LOAD_TIMEOUT_MS);
+      }
+
+      invalidateTimer = setTimeout(() => {
+        try {
+          if (!cancelled) {
+            mapInstanceRef.current?.invalidateSize();
+          }
+        } catch {
           // Ignorar si el mapa fue desmontado
         }
       }, 50);
+    };
+
+    try {
+      const startIdx = candidates.findIndex((c) => !isSourceInCooldown(c.url));
+      mountCandidate(startIdx >= 0 ? startIdx : 0);
     } catch (err) {
       console.warn('Error al cambiar capa en mapa Leaflet:', err);
     }
+
+    return () => {
+      cancelled = true;
+      clearTimersAndListeners();
+      removeCurrentTileLayers();
+    };
   }, [activeLayer]);
 
   // 3. Manejo de clics en el mapa para marcar punto A y punto B
@@ -709,7 +925,7 @@ function InteractiveMap({
         </div>
       )}
 
-      {/* Cartel Flotante de Estado de Ruteo o Instrucción de Clic */}
+      {/* Cartel Flotante de Estado de Ruteo, Respaldo de Mapa o Instrucción de Clic */}
       {!isCleanView && routingNotice && (
         <div className="absolute top-16 left-1/2 -translate-x-1/2 z-20 pointer-events-auto bg-slate-900/95 text-white backdrop-blur-md px-4 py-1.5 rounded-full border border-emerald-500/40 shadow-xl text-xs flex items-center gap-2">
           {isRouting ? (
@@ -718,6 +934,16 @@ function InteractiveMap({
             <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
           )}
           <span>{routingNotice}</span>
+        </div>
+      )}
+
+      {!isCleanView && !routingNotice && tileFallbackNotice && (
+        <div
+          role="status"
+          className="absolute top-16 left-1/2 -translate-x-1/2 z-20 pointer-events-auto bg-slate-900/95 text-amber-200 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-amber-500/40 shadow-xl text-[11px] flex items-center gap-2 whitespace-nowrap max-w-[calc(100%-1.5rem)] truncate"
+        >
+          <Layers className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+          <span className="truncate">{tileFallbackNotice}</span>
         </div>
       )}
 

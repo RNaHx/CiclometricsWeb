@@ -10,6 +10,13 @@ El formato de versión utilizado es:
 
 ---
 
+## [1.8.1] - 2026-11-26
+### Fixed
+- **Failover Automático de Teselas Cartográficas**: Incorporación de detección de errores (`tileerror`) y timeouts (`3500 ms`) con caché temporal de disponibilidad (`5 min`) en [`InteractiveMap.jsx`](file:///c:/Users/ricar/OneDrive/Desktop/CiclometricsWeb/frontend/src/components/InteractiveMap.jsx) para activar automáticamente mapas de respaldo (**Esri World Topo + Waymarked Trails Cycling**, **OpenTopoMap** y **OpenStreetMap Standard**) ante caídas del servidor CyclOSM, evitando el mapa en negro al trazar rutas en la vista **Ciclista / Topo**. Además se eliminó la creación duplicada de la capa inicial al montar el mapa y se respetaron proveedores sin subdominios.
+- **Orden de Hooks en Modal de Perfil**: Reubicación del retorno temprano `if (!isOpen) return null` en [`ProfileModal.jsx`](file:///c:/Users/ricar/OneDrive/Desktop/CiclometricsWeb/frontend/src/components/ProfileModal.jsx) después de las llamadas a `useState`, resolviendo los errores de `react-hooks/rules-of-hooks` en `oxlint`.
+
+---
+
 ## [1.8.0] - 2026-11-24
 ### Added
 - **Alerta de Cobertura Geográfica (Región Metropolitana)**: Incorporación de [`frontend/src/utils/rmCoverage.js`](file:///c:/Users/ricar/OneDrive/Desktop/CiclometricsWeb/frontend/src/utils/rmCoverage.js) para detectar ubicaciones fuera de la RM mediante metadatos administrativos (Nominatim/Photon) y polígono geográfico, desplegando etiqueta y aviso preventivo en [`RoutePlanningCard.jsx`](file:///c:/Users/ricar/OneDrive/Desktop/CiclometricsWeb/frontend/src/components/RoutePlanningCard.jsx) junto a un modal de alerta (`role="alertdialog"`) y banner persistente en [`App.jsx`](file:///c:/Users/ricar/OneDrive/Desktop/CiclometricsWeb/frontend/src/App.jsx).
